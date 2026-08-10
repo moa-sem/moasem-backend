@@ -1,8 +1,8 @@
 ---
-name: 버그 리포트
-about: 오동작/에러 보고
-title: "[BUG] "
-labels: bug
+name: 🐛 fix (버그 수정)
+about: 오동작/에러 보고 및 수정
+title: "[FIX] "
+labels: fix
 assignees: ''
 ---
 

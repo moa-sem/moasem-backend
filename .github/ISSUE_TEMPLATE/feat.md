@@ -1,8 +1,8 @@
 ---
-name: 기능 개발
+name: ✨ feat (기능 개발)
 about: 새로운 기능/API 구현 작업
 title: "[FEAT] "
-labels: feature
+labels: feat
 assignees: ''
 ---
 
