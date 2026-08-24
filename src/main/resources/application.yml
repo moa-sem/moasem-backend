@@ -4,6 +4,14 @@ spring:
   profiles:
     active: local
 
+springdoc:
+  api-docs:
+    path: /v3/api-docs
+  swagger-ui:
+    path: /swagger-ui.html
+    operations-sorter: alpha
+    tags-sorter: alpha
+
 ---
 spring:
   config:
