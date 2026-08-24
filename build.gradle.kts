@@ -51,6 +51,9 @@ dependencies {
 	implementation("com.itextpdf:itext7-core:8.0.5")
 	implementation("org.apache.commons:commons-csv:1.11.0")
 
+	// API 문서 (Swagger)
+	implementation("org.springdoc:springdoc-openapi-starter-webmvc-ui:3.1.0")
+
 	// 개발 편의
 	developmentOnly("org.springframework.boot:spring-boot-devtools")
 	annotationProcessor("org.springframework.boot:spring-boot-configuration-processor")
