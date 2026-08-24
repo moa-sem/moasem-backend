@@ -42,6 +42,8 @@ dependencies {
 	// Kotlin 지원
 	implementation("tools.jackson.module:jackson-module-kotlin")
 	implementation("org.jetbrains.kotlin:kotlin-reflect")
+	// Hibernate가 JSONB 매핑에 쓰는 Jackson 2용 Kotlin 모듈 (Spring 본체는 Jackson 3 사용)
+	implementation("com.fasterxml.jackson.module:jackson-module-kotlin")
 
 	// AWS S3 (증빙 이미지 업로드)
 	implementation(platform("software.amazon.awssdk:bom:2.29.7"))
@@ -60,6 +62,7 @@ dependencies {
 
 	// 테스트
 	testImplementation("org.springframework.boot:spring-boot-starter-test")
+	testImplementation("org.springframework.boot:spring-boot-starter-data-jpa-test")
 	testImplementation("org.springframework.security:spring-security-test")
 	testImplementation("io.mockk:mockk:1.13.13")
 	testImplementation("com.ninja-squad:springmockk:4.0.2")
