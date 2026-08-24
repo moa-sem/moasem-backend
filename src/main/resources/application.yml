@@ -3,6 +3,11 @@ spring:
     name: moasem-backend
   profiles:
     active: local
+  jpa:
+    properties:
+      hibernate:
+        # Kotlin data class와 java.time 타입을 JSONB로 매핑하기 위한 커스텀 FormatMapper
+        type.json_format_mapper: com.moasem.backend.global.config.KotlinJsonFormatMapper
 
 springdoc:
   api-docs:
