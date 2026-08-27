@@ -51,6 +51,9 @@ dependencies {
 	implementation("com.itextpdf:itext7-core:8.0.5")
 	implementation("org.apache.commons:commons-csv:1.11.0")
 
+	// 운영 (헬스 체크 — 배포 시 컨테이너 상태 판정에 사용)
+	implementation("org.springframework.boot:spring-boot-starter-actuator")
+
 	// 개발 편의
 	developmentOnly("org.springframework.boot:spring-boot-devtools")
 	annotationProcessor("org.springframework.boot:spring-boot-configuration-processor")

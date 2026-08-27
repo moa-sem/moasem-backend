@@ -1,0 +1,67 @@
+# EC2 운영용. CD 워크플로가 이 파일을 EC2로 전송한 뒤 실행한다.
+# 비밀값은 같은 디렉터리의 .env 파일에서 읽는다 (docs/DEPLOYMENT.md 참고).
+services:
+  db:
+    image: postgres:16-alpine
+    container_name: moasem-db
+    restart: unless-stopped
+    # 외부 노출 없이 컨테이너 네트워크 안에서만 접근
+    expose:
+      - "5432"
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-moasem}
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  redis:
+    image: redis:7-alpine
+    container_name: moasem-redis
+    restart: unless-stopped
+    expose:
+      - "6379"
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  app:
+    # CD 워크플로가 APP_IMAGE 를 주입한다 (ghcr.io/moa-sem/moasem-backend:latest)
+    image: ${APP_IMAGE}
+    container_name: moasem-app
+    restart: unless-stopped
+    ports:
+      - "8080:8080"
+    environment:
+      SPRING_PROFILES_ACTIVE: prod
+      DB_URL: jdbc:postgresql://db:5432/${POSTGRES_DB:-moasem}
+      DB_USERNAME: ${POSTGRES_USER}
+      DB_PASSWORD: ${POSTGRES_PASSWORD}
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    healthcheck:
+      # -f 를 쓰지 않는 이유: Security 설정 전에는 /actuator/health 가 401 을 주는데
+      # 그것도 "앱이 떠 있다"는 신호다. 연결 자체가 안 될 때만 실패로 본다.
+      test: ["CMD-SHELL", "curl -s -o /dev/null http://localhost:8080/actuator/health || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 40s
+
+volumes:
+  postgres_data:
+  redis_data:

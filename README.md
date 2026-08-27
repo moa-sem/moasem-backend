@@ -28,6 +28,7 @@
 ## 문서
 
 - [개발 컨벤션](./docs/CONVENTION.md) — 패키지 구조, 네이밍, Git 전략, 코드 스타일
+- [배포 가이드](./docs/DEPLOYMENT.md) — CI/CD 파이프라인, GitHub Secrets, EC2 초기 설정
 
 ## 패키지 구조
 

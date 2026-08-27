@@ -1,0 +1,13 @@
+.git
+.gradle
+.idea
+.github
+build
+out
+Dockerfile
+docker-compose*.yml
+.DS_Store
+*.bat
+gradlew.bat
+*.md
+docs

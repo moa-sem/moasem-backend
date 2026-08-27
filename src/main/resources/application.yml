@@ -4,13 +4,23 @@ spring:
   profiles:
     active: local
 
+# 배포 헬스 체크용. SecurityConfig 작성 시 /actuator/health 는 permitAll 로 열어둘 것.
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health
+  endpoint:
+    health:
+      show-details: never
+
 ---
 spring:
   config:
     activate:
       on-profile: local
   datasource:
-    url: jdbc:postgresql://localhost:5432/moasem
+    url: jdbc:postgresql://${DB_HOST:localhost}:5432/moasem
     username: ${DB_USERNAME:postgres}
     password: ${DB_PASSWORD:postgres}
   jpa:
@@ -22,7 +32,7 @@ spring:
         format_sql: true
   data:
     redis:
-      host: localhost
+      host: ${REDIS_HOST:localhost}
       port: 6379
 
 logging:

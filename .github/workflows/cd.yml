@@ -1,0 +1,125 @@
+name: CD
+
+on:
+  push:
+    branches: [ main ]
+  workflow_dispatch:
+
+# 배포는 동시에 하나만 (진행 중인 배포는 중단하지 않음)
+concurrency:
+  group: cd-production
+  cancel-in-progress: false
+
+env:
+  REGISTRY: ghcr.io
+  IMAGE_NAME: ${{ github.repository }}
+  DEPLOY_DIR: moasem   # EC2 SSH 사용자 홈 기준 상대 경로
+
+jobs:
+  build-and-push:
+    name: 이미지 빌드 및 GHCR 푸시
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+
+    steps:
+      - name: 소스 체크아웃
+        uses: actions/checkout@v4
+
+      - name: Buildx 설정
+        uses: docker/setup-buildx-action@v3
+
+      - name: GHCR 로그인
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: 이미지 태그 생성
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
+          tags: |
+            type=raw,value=latest
+            type=sha,format=long
+
+      - name: 이미지 빌드 및 푸시
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+  deploy:
+    name: EC2 배포
+    needs: build-and-push
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: read
+
+    steps:
+      - name: 소스 체크아웃
+        uses: actions/checkout@v4
+
+      - name: compose 파일 EC2로 전송
+        uses: appleboy/scp-action@v0.1.7
+        with:
+          host: ${{ secrets.EC2_HOST }}
+          username: ${{ secrets.EC2_USER }}
+          key: ${{ secrets.EC2_SSH_KEY }}
+          port: ${{ secrets.EC2_PORT || 22 }}
+          source: docker-compose.prod.yml
+          target: ${{ env.DEPLOY_DIR }}
+
+      - name: 컨테이너 교체 및 헬스 체크
+        uses: appleboy/ssh-action@v1
+        with:
+          host: ${{ secrets.EC2_HOST }}
+          username: ${{ secrets.EC2_USER }}
+          key: ${{ secrets.EC2_SSH_KEY }}
+          port: ${{ secrets.EC2_PORT || 22 }}
+          envs: REGISTRY,IMAGE_NAME,DEPLOY_DIR,GHCR_USER,GHCR_TOKEN
+          script_stop: true
+          script: |
+            set -e
+            cd "$HOME/$DEPLOY_DIR"
+
+            # .env(DB/Redis 비밀값)는 서버에 한 번만 만들어 두고 재사용한다. docs/DEPLOYMENT.md 참고
+            if [ ! -f .env ]; then
+              echo "::error::$HOME/$DEPLOY_DIR/.env 가 없습니다. docs/DEPLOYMENT.md 를 보고 먼저 생성하세요."
+              exit 1
+            fi
+
+            echo "$GHCR_TOKEN" | docker login "$REGISTRY" -u "$GHCR_USER" --password-stdin
+
+            export APP_IMAGE="$REGISTRY/$IMAGE_NAME:latest"
+            docker compose -f docker-compose.prod.yml pull app
+            docker compose -f docker-compose.prod.yml up -d --remove-orphans
+
+            # app 컨테이너가 healthy 가 될 때까지 최대 3분 대기
+            for i in $(seq 1 36); do
+              status=$(docker inspect -f '{{.State.Health.Status}}' moasem-app 2>/dev/null || echo starting)
+              if [ "$status" = "healthy" ]; then
+                echo "배포 성공: app 컨테이너 healthy"
+                docker image prune -f
+                docker logout "$REGISTRY"
+                exit 0
+              fi
+              echo "헬스 체크 대기 중... ($i/36, 현재 상태: $status)"
+              sleep 5
+            done
+
+            echo "헬스 체크 실패. 최근 로그:"
+            docker compose -f docker-compose.prod.yml logs --tail 100 app
+            docker logout "$REGISTRY"
+            exit 1
+        env:
+          GHCR_USER: ${{ github.actor }}
+          GHCR_TOKEN: ${{ secrets.GITHUB_TOKEN }}
