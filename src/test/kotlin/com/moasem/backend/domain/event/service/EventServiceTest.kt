@@ -1,11 +1,13 @@
 package com.moasem.backend.domain.event.service
 
 import com.moasem.backend.domain.event.dto.CreateEventRequest
+import com.moasem.backend.domain.event.dto.EventListResponse
 import com.moasem.backend.domain.event.entity.Event
 import com.moasem.backend.domain.event.entity.EventStatus
 import com.moasem.backend.domain.event.repository.EventRepository
 import com.moasem.backend.domain.event.repository.BudgetAdditionRepository
 import com.moasem.backend.domain.event.service.port.GroupAccessProvider
+import com.moasem.backend.domain.event.service.port.ApprovedSpendingTotalProvider
 import io.mockk.every
 import io.mockk.mockk
 import io.mockk.slot
@@ -23,15 +25,22 @@ class EventServiceTest {
     private val eventRepository = mockk<EventRepository>()
     private val budgetAdditionRepository = mockk<BudgetAdditionRepository>()
     private val groupAccessProvider = mockk<GroupAccessProvider>()
+    private val approvedSpendingTotalProvider = mockk<ApprovedSpendingTotalProvider>()
     private lateinit var eventService: EventService
 
     @BeforeEach
     fun setUp() {
-        eventService = EventService(eventRepository, budgetAdditionRepository, groupAccessProvider)
+        eventService = EventService(
+            eventRepository,
+            budgetAdditionRepository,
+            groupAccessProvider,
+            approvedSpendingTotalProvider,
+        )
         every { groupAccessProvider.existsGroup(GROUP_ID) } returns true
         every { groupAccessProvider.isMember(GROUP_ID, OWNER_ID) } returns true
         every { groupAccessProvider.isOwner(GROUP_ID, OWNER_ID) } returns true
         every { budgetAdditionRepository.sumAmountByEventId(EVENT_ID) } returns 0L
+        every { approvedSpendingTotalProvider.getApprovedSpendingTotal(EVENT_ID) } returns 0L
     }
 
     @Nested
@@ -54,6 +63,8 @@ class EventServiceTest {
             assertThat(savedEvent.captured.description).isNull()
             assertThat(response.eventId).isEqualTo(EVENT_ID)
             assertThat(response.initialBudget).isEqualTo(500_000L)
+            assertThat(response.approvedSpending).isZero()
+            assertThat(response.remainingBudget).isEqualTo(500_000L)
         }
 
         @Test
@@ -192,11 +203,29 @@ class EventServiceTest {
                 )
             }
         }
+
+        @Test
+        fun `목록 응답에는 승인 지출과 잔여 예산 필드가 없다`() {
+            val fields = EventListResponse::class.members.map { it.name }
+
+            assertThat(fields).doesNotContain("approvedSpending", "remainingBudget")
+        }
     }
 
     @Nested
     @DisplayName("행사 상세 조회")
     inner class GetEvent {
+
+        @Test
+        fun `모임 구성원이 아니면 승인 지출 합계를 조회하지 않는다`() {
+            every { groupAccessProvider.isMember(GROUP_ID, OWNER_ID) } returns false
+
+            assertThatThrownBy { eventService.getEvent(GROUP_ID, EVENT_ID, OWNER_ID) }
+                .isInstanceOf(IllegalStateException::class.java)
+                .hasMessageContaining("모임 구성원만")
+
+            verify(exactly = 0) { approvedSpendingTotalProvider.getApprovedSpendingTotal(any()) }
+        }
 
         @Test
         fun `모임 구성원은 해당 모임의 행사 상세를 조회한다`() {
@@ -208,6 +237,9 @@ class EventServiceTest {
             assertThat(response.groupId).isEqualTo(GROUP_ID)
             assertThat(response.additionalBudget).isZero()
             assertThat(response.totalBudget).isEqualTo(500_000L)
+            assertThat(response.approvedSpending).isZero()
+            assertThat(response.remainingBudget).isEqualTo(500_000L)
+            verify { approvedSpendingTotalProvider.getApprovedSpendingTotal(EVENT_ID) }
         }
 
         @Test
@@ -220,15 +252,64 @@ class EventServiceTest {
             assertThat(response.initialBudget).isEqualTo(500_000L)
             assertThat(response.additionalBudget).isEqualTo(150_000L)
             assertThat(response.totalBudget).isEqualTo(650_000L)
+            assertThat(response.approvedSpending).isZero()
+            assertThat(response.remainingBudget).isEqualTo(650_000L)
         }
 
         @Test
-        fun `행사가 없거나 다른 모임 행사이면 예외가 발생한다`() {
+        fun `최초 예산 추가 예산 승인 지출을 반영해 잔여 예산을 계산한다`() {
+            every { eventRepository.findByIdAndGroupIdAndDeletedAtIsNull(EVENT_ID, GROUP_ID) } returns event(EVENT_ID)
+            every { budgetAdditionRepository.sumAmountByEventId(EVENT_ID) } returns 150_000L
+            every { approvedSpendingTotalProvider.getApprovedSpendingTotal(EVENT_ID) } returns 320_000L
+
+            val response = eventService.getEvent(GROUP_ID, EVENT_ID, OWNER_ID)
+
+            assertThat(response.totalBudget).isEqualTo(650_000L)
+            assertThat(response.approvedSpending).isEqualTo(320_000L)
+            assertThat(response.remainingBudget).isEqualTo(330_000L)
+        }
+
+        @Test
+        fun `승인 지출이 총예산과 같으면 잔여 예산은 0원이다`() {
+            every { eventRepository.findByIdAndGroupIdAndDeletedAtIsNull(EVENT_ID, GROUP_ID) } returns event(EVENT_ID)
+            every { budgetAdditionRepository.sumAmountByEventId(EVENT_ID) } returns 150_000L
+            every { approvedSpendingTotalProvider.getApprovedSpendingTotal(EVENT_ID) } returns 650_000L
+
+            val response = eventService.getEvent(GROUP_ID, EVENT_ID, OWNER_ID)
+
+            assertThat(response.remainingBudget).isZero()
+        }
+
+        @Test
+        fun `승인 지출이 총예산보다 크면 음수 잔여 예산을 그대로 반환한다`() {
+            every { eventRepository.findByIdAndGroupIdAndDeletedAtIsNull(EVENT_ID, GROUP_ID) } returns event(EVENT_ID)
+            every { approvedSpendingTotalProvider.getApprovedSpendingTotal(EVENT_ID) } returns 550_000L
+
+            val response = eventService.getEvent(GROUP_ID, EVENT_ID, OWNER_ID)
+
+            assertThat(response.totalBudget).isEqualTo(500_000L)
+            assertThat(response.remainingBudget).isEqualTo(-50_000L)
+        }
+
+        @Test
+        fun `존재하지 않는 행사에서는 승인 지출 합계를 조회하지 않는다`() {
             every { eventRepository.findByIdAndGroupIdAndDeletedAtIsNull(EVENT_ID, GROUP_ID) } returns null
 
             assertThatThrownBy { eventService.getEvent(GROUP_ID, EVENT_ID, OWNER_ID) }
                 .isInstanceOf(NoSuchElementException::class.java)
                 .hasMessageContaining("행사를 찾을 수 없습니다")
+
+            verify(exactly = 0) { approvedSpendingTotalProvider.getApprovedSpendingTotal(any()) }
+        }
+
+        @Test
+        fun `다른 모임 행사에서는 승인 지출 합계를 조회하지 않는다`() {
+            every { eventRepository.findByIdAndGroupIdAndDeletedAtIsNull(EVENT_ID, GROUP_ID) } returns null
+
+            assertThatThrownBy { eventService.getEvent(GROUP_ID, EVENT_ID, OWNER_ID) }
+                .isInstanceOf(NoSuchElementException::class.java)
+
+            verify(exactly = 0) { approvedSpendingTotalProvider.getApprovedSpendingTotal(any()) }
         }
 
         @Test
@@ -239,6 +320,7 @@ class EventServiceTest {
                 .isInstanceOf(NoSuchElementException::class.java)
 
             verify { eventRepository.findByIdAndGroupIdAndDeletedAtIsNull(EVENT_ID, GROUP_ID) }
+            verify(exactly = 0) { approvedSpendingTotalProvider.getApprovedSpendingTotal(any()) }
         }
     }
 
