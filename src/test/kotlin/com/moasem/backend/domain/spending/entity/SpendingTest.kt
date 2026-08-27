@@ -1,5 +1,6 @@
 package com.moasem.backend.domain.spending.entity
 
+import com.moasem.backend.global.storage.FileUploadPolicy
 import org.assertj.core.api.Assertions.assertThat
 import org.assertj.core.api.Assertions.assertThatThrownBy
 import org.junit.jupiter.api.DisplayName
@@ -49,12 +50,12 @@ class SpendingTest {
         fun `JPEG PNG 외의 증빙 형식은 거부한다`() {
             assertThatThrownBy { evidence(mimeType = "application/pdf") }
                 .isInstanceOf(IllegalArgumentException::class.java)
-                .hasMessageContaining("JPEG 또는 PNG")
+                .hasMessageContaining("허용하지 않는 파일 형식")
         }
 
         @Test
         fun `허용 용량을 넘는 증빙 파일은 거부한다`() {
-            assertThatThrownBy { evidence(fileSize = Spending.MAX_FILE_SIZE_BYTES + 1) }
+            assertThatThrownBy { evidence(fileSize = FileUploadPolicy.EVIDENCE_IMAGE.maxSizeBytes + 1) }
                 .isInstanceOf(IllegalArgumentException::class.java)
                 .hasMessageContaining("파일 크기")
         }
