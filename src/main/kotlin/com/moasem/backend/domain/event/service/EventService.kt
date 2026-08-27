@@ -7,6 +7,7 @@ import com.moasem.backend.domain.event.dto.EventListResponse
 import com.moasem.backend.domain.event.entity.Event
 import com.moasem.backend.domain.event.entity.EventStatus
 import com.moasem.backend.domain.event.repository.EventRepository
+import com.moasem.backend.domain.event.repository.BudgetAdditionRepository
 import com.moasem.backend.domain.event.service.port.GroupAccessProvider
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
@@ -14,6 +15,7 @@ import org.springframework.transaction.annotation.Transactional
 @Service
 class EventService(
     private val eventRepository: EventRepository,
+    private val budgetAdditionRepository: BudgetAdditionRepository,
     private val groupAccessProvider: GroupAccessProvider,
 ) {
 
@@ -29,7 +31,7 @@ class EventService(
             initialBudget = request.initialBudget,
         )
 
-        return EventConverter.toDetailResponse(eventRepository.save(event))
+        return EventConverter.toDetailResponse(eventRepository.save(event), additionalBudget = 0L)
     }
 
     @Transactional(readOnly = true)
@@ -48,7 +50,8 @@ class EventService(
         validateGroupMember(groupId, currentUserId)
         val event = eventRepository.findByIdAndGroupId(eventId, groupId)
             ?: throw NoSuchElementException("행사를 찾을 수 없습니다. eventId=$eventId")
-        return EventConverter.toDetailResponse(event)
+        val additionalBudget = budgetAdditionRepository.sumAmountByEventId(event.id!!)
+        return EventConverter.toDetailResponse(event, additionalBudget)
     }
 
     private fun validateGroupOwner(groupId: Long, userId: Long) {
