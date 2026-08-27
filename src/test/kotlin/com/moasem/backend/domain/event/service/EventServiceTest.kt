@@ -49,6 +49,7 @@ class EventServiceTest {
             val response = eventService.createEvent(GROUP_ID, OWNER_ID, createRequest())
 
             assertThat(savedEvent.captured.status).isEqualTo(EventStatus.ACTIVE)
+            assertThat(savedEvent.captured.deletedAt).isNull()
             assertThat(savedEvent.captured.title).isEqualTo("여름 MT")
             assertThat(savedEvent.captured.description).isNull()
             assertThat(response.eventId).isEqualTo(EVENT_ID)
@@ -161,25 +162,35 @@ class EventServiceTest {
     inner class GetEvents {
 
         @Test
-        fun `상태가 없으면 모임의 전체 행사를 조회한다`() {
-            every { eventRepository.findAllByGroupIdOrderByStartAtDesc(GROUP_ID) } returns listOf(event(EVENT_ID))
+        fun `상태가 없으면 논리 삭제된 행사를 제외한 모임의 전체 행사를 조회한다`() {
+            every {
+                eventRepository.findAllByGroupIdAndDeletedAtIsNullOrderByStartAtDesc(GROUP_ID)
+            } returns listOf(event(EVENT_ID))
 
             val responses = eventService.getEvents(GROUP_ID, OWNER_ID)
 
             assertThat(responses.map { it.eventId }).containsExactly(EVENT_ID)
-            verify { eventRepository.findAllByGroupIdOrderByStartAtDesc(GROUP_ID) }
+            verify { eventRepository.findAllByGroupIdAndDeletedAtIsNullOrderByStartAtDesc(GROUP_ID) }
         }
 
         @Test
-        fun `상태가 있으면 해당 상태의 행사만 조회한다`() {
+        fun `상태가 있으면 논리 삭제된 행사를 제외하고 해당 상태의 행사만 조회한다`() {
             every {
-                eventRepository.findAllByGroupIdAndStatusOrderByStartAtDesc(GROUP_ID, EventStatus.CLOSED)
+                eventRepository.findAllByGroupIdAndStatusAndDeletedAtIsNullOrderByStartAtDesc(
+                    GROUP_ID,
+                    EventStatus.CLOSED,
+                )
             } returns listOf(event(EVENT_ID, EventStatus.CLOSED))
 
             val responses = eventService.getEvents(GROUP_ID, OWNER_ID, EventStatus.CLOSED)
 
             assertThat(responses).allSatisfy { assertThat(it.status).isEqualTo(EventStatus.CLOSED) }
-            verify { eventRepository.findAllByGroupIdAndStatusOrderByStartAtDesc(GROUP_ID, EventStatus.CLOSED) }
+            verify {
+                eventRepository.findAllByGroupIdAndStatusAndDeletedAtIsNullOrderByStartAtDesc(
+                    GROUP_ID,
+                    EventStatus.CLOSED,
+                )
+            }
         }
     }
 
@@ -189,7 +200,7 @@ class EventServiceTest {
 
         @Test
         fun `모임 구성원은 해당 모임의 행사 상세를 조회한다`() {
-            every { eventRepository.findByIdAndGroupId(EVENT_ID, GROUP_ID) } returns event(EVENT_ID)
+            every { eventRepository.findByIdAndGroupIdAndDeletedAtIsNull(EVENT_ID, GROUP_ID) } returns event(EVENT_ID)
 
             val response = eventService.getEvent(GROUP_ID, EVENT_ID, OWNER_ID)
 
@@ -201,7 +212,7 @@ class EventServiceTest {
 
         @Test
         fun `최초 예산과 추가 예산을 합산한 총예산을 조회한다`() {
-            every { eventRepository.findByIdAndGroupId(EVENT_ID, GROUP_ID) } returns event(EVENT_ID)
+            every { eventRepository.findByIdAndGroupIdAndDeletedAtIsNull(EVENT_ID, GROUP_ID) } returns event(EVENT_ID)
             every { budgetAdditionRepository.sumAmountByEventId(EVENT_ID) } returns 150_000L
 
             val response = eventService.getEvent(GROUP_ID, EVENT_ID, OWNER_ID)
@@ -213,11 +224,21 @@ class EventServiceTest {
 
         @Test
         fun `행사가 없거나 다른 모임 행사이면 예외가 발생한다`() {
-            every { eventRepository.findByIdAndGroupId(EVENT_ID, GROUP_ID) } returns null
+            every { eventRepository.findByIdAndGroupIdAndDeletedAtIsNull(EVENT_ID, GROUP_ID) } returns null
 
             assertThatThrownBy { eventService.getEvent(GROUP_ID, EVENT_ID, OWNER_ID) }
                 .isInstanceOf(NoSuchElementException::class.java)
                 .hasMessageContaining("행사를 찾을 수 없습니다")
+        }
+
+        @Test
+        fun `논리 삭제된 행사는 상세 조회 대상에서 제외한다`() {
+            every { eventRepository.findByIdAndGroupIdAndDeletedAtIsNull(EVENT_ID, GROUP_ID) } returns null
+
+            assertThatThrownBy { eventService.getEvent(GROUP_ID, EVENT_ID, OWNER_ID) }
+                .isInstanceOf(NoSuchElementException::class.java)
+
+            verify { eventRepository.findByIdAndGroupIdAndDeletedAtIsNull(EVENT_ID, GROUP_ID) }
         }
     }
 

@@ -6,9 +6,12 @@ import org.springframework.data.jpa.repository.JpaRepository
 
 interface EventRepository : JpaRepository<Event, Long> {
 
-    fun findAllByGroupIdOrderByStartAtDesc(groupId: Long): List<Event>
+    fun findAllByGroupIdAndDeletedAtIsNullOrderByStartAtDesc(groupId: Long): List<Event>
 
-    fun findAllByGroupIdAndStatusOrderByStartAtDesc(groupId: Long, status: EventStatus): List<Event>
+    fun findAllByGroupIdAndStatusAndDeletedAtIsNullOrderByStartAtDesc(
+        groupId: Long,
+        status: EventStatus,
+    ): List<Event>
 
-    fun findByIdAndGroupId(eventId: Long, groupId: Long): Event?
+    fun findByIdAndGroupIdAndDeletedAtIsNull(eventId: Long, groupId: Long): Event?
 }

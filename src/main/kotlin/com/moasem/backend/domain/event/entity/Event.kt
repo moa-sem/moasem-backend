@@ -46,6 +46,18 @@ class Event protected constructor(
     @Column(name = "updated_at", nullable = false)
     val updatedAt: LocalDateTime? = null
 
+    @Column(name = "deleted_at")
+    var deletedAt: LocalDateTime? = null
+        protected set
+
+    val isDeleted: Boolean
+        get() = deletedAt != null
+
+    fun delete(deletedAt: LocalDateTime = LocalDateTime.now()) {
+        check(!isDeleted) { "이미 삭제된 행사입니다." }
+        this.deletedAt = deletedAt
+    }
+
     companion object {
         const val TITLE_MAX_LENGTH = 100
 
