@@ -22,6 +22,8 @@ data class ReportSnapshot(
         val endAt: LocalDateTime,
         val groupId: Long,
         val groupName: String,
+        /** 행사 참여 인원. event 도메인에서 마감 시 확정되며, 아직 제공되지 않을 수 있다. */
+        val participantCount: Int? = null,
     )
 
     data class BudgetSummary(
@@ -35,6 +37,8 @@ data class ReportSnapshot(
     data class BudgetAdditionLine(
         val amount: Long,
         val reason: String,
+        /** 예산을 추가한 사람. 과거 스냅샷에는 없을 수 있어 기본값을 둔다. */
+        val addedBy: String? = null,
         val addedAt: LocalDateTime,
     )
 

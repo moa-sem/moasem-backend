@@ -19,6 +19,8 @@ class FakeEventSnapshotProvider : EventSnapshotProvider {
         store[eventId] ?: throw NoSuchElementException("행사를 찾을 수 없습니다. eventId=$eventId")
 
     companion object {
+        val BASE_TIME: LocalDateTime = LocalDateTime.of(2026, 8, 24, 10, 0)
+
         /** 필요한 필드만 덮어써서 쓰는 기본 원자료. */
         fun sampleData(
             eventId: Long = 1L,
@@ -27,38 +29,50 @@ class FakeEventSnapshotProvider : EventSnapshotProvider {
             initialBudget: Long = 500_000L,
             budgetAdditions: List<BudgetAdditionData> = emptyList(),
             approvedSpendings: List<ApprovedSpendingData> = listOf(sampleSpending()),
-        ): EventSnapshotData {
-            val startAt = LocalDateTime.of(2026, 8, 24, 10, 0)
-            return EventSnapshotData(
-                eventId = eventId,
-                title = "여름 MT",
-                startAt = startAt,
-                endAt = startAt.plusDays(2),
-                status = status,
-                groupId = 10L,
-                groupName = "백엔드 스터디",
-                participantCount = participantCount,
-                initialBudget = initialBudget,
-                budgetAdditions = budgetAdditions,
-                approvedSpendings = approvedSpendings,
-            )
-        }
+        ): EventSnapshotData = EventSnapshotData(
+            eventId = eventId,
+            title = "여름 MT",
+            startAt = BASE_TIME,
+            endAt = BASE_TIME.plusDays(2),
+            status = status,
+            groupId = 10L,
+            groupName = "백엔드 스터디",
+            participantCount = participantCount,
+            initialBudget = initialBudget,
+            budgetAdditions = budgetAdditions,
+            approvedSpendings = approvedSpendings,
+        )
 
         fun sampleSpending(
             spendingId: Long = 100L,
             description: String = "저녁 식사",
             amount: Long = 320_000L,
             tag: String = "MEAL",
+            tagLabel: String = "식비",
             payerName: String = "김석주",
+            spentAt: LocalDateTime = BASE_TIME.plusDays(1),
             receiptUrl: String? = null,
         ): ApprovedSpendingData = ApprovedSpendingData(
             spendingId = spendingId,
             description = description,
             amount = amount,
             tag = tag,
+            tagLabel = tagLabel,
             payerName = payerName,
-            spentAt = LocalDateTime.of(2026, 8, 25, 19, 0),
+            spentAt = spentAt,
             receiptUrl = receiptUrl,
+        )
+
+        fun sampleAddition(
+            amount: Long = 100_000L,
+            reason: String = "숙소 추가 예약",
+            addedBy: String = "김소담",
+            addedAt: LocalDateTime = BASE_TIME.plusHours(2),
+        ): BudgetAdditionData = BudgetAdditionData(
+            amount = amount,
+            reason = reason,
+            addedBy = addedBy,
+            addedAt = addedAt,
         )
     }
 }
