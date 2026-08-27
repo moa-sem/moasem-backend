@@ -38,9 +38,9 @@ class EventService(
     fun getEvents(groupId: Long, currentUserId: Long, status: EventStatus? = null): List<EventListResponse> {
         validateGroupMember(groupId, currentUserId)
         val events = if (status == null) {
-            eventRepository.findAllByGroupIdOrderByStartAtDesc(groupId)
+            eventRepository.findAllByGroupIdAndDeletedAtIsNullOrderByStartAtDesc(groupId)
         } else {
-            eventRepository.findAllByGroupIdAndStatusOrderByStartAtDesc(groupId, status)
+            eventRepository.findAllByGroupIdAndStatusAndDeletedAtIsNullOrderByStartAtDesc(groupId, status)
         }
         return events.map(EventConverter::toListResponse)
     }
@@ -48,7 +48,7 @@ class EventService(
     @Transactional(readOnly = true)
     fun getEvent(groupId: Long, eventId: Long, currentUserId: Long): EventDetailResponse {
         validateGroupMember(groupId, currentUserId)
-        val event = eventRepository.findByIdAndGroupId(eventId, groupId)
+        val event = eventRepository.findByIdAndGroupIdAndDeletedAtIsNull(eventId, groupId)
             ?: throw NoSuchElementException("행사를 찾을 수 없습니다. eventId=$eventId")
         val additionalBudget = budgetAdditionRepository.sumAmountByEventId(event.id!!)
         return EventConverter.toDetailResponse(event, additionalBudget)
