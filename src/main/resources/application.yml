@@ -3,6 +3,19 @@ spring:
     name: moasem-backend
   profiles:
     active: local
+  jpa:
+    properties:
+      hibernate:
+        # Kotlin data class와 java.time 타입을 JSONB로 매핑하기 위한 커스텀 FormatMapper
+        type.json_format_mapper: com.moasem.backend.global.config.KotlinJsonFormatMapper
+
+springdoc:
+  api-docs:
+    path: /v3/api-docs
+  swagger-ui:
+    path: /swagger-ui.html
+    operations-sorter: alpha
+    tags-sorter: alpha
 
 # 배포 헬스 체크용. SecurityConfig 작성 시 /actuator/health 는 permitAll 로 열어둘 것.
 management:
