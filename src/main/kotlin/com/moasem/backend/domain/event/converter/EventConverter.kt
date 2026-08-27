@@ -15,16 +15,25 @@ object EventConverter {
         initialBudget = event.initialBudget,
     )
 
-    fun toDetailResponse(event: Event, additionalBudget: Long): EventDetailResponse = EventDetailResponse(
-        eventId = event.id ?: error("저장되지 않은 행사는 응답으로 변환할 수 없습니다."),
-        groupId = event.groupId,
-        title = event.title,
-        description = event.description,
-        startAt = event.startAt,
-        endAt = event.endAt,
-        status = event.status,
-        initialBudget = event.initialBudget,
-        additionalBudget = additionalBudget,
-        totalBudget = event.initialBudget + additionalBudget,
-    )
+    fun toDetailResponse(
+        event: Event,
+        additionalBudget: Long,
+        approvedSpending: Long,
+    ): EventDetailResponse {
+        val totalBudget = event.initialBudget + additionalBudget
+        return EventDetailResponse(
+            eventId = event.id ?: error("저장되지 않은 행사는 응답으로 변환할 수 없습니다."),
+            groupId = event.groupId,
+            title = event.title,
+            description = event.description,
+            startAt = event.startAt,
+            endAt = event.endAt,
+            status = event.status,
+            initialBudget = event.initialBudget,
+            additionalBudget = additionalBudget,
+            totalBudget = totalBudget,
+            approvedSpending = approvedSpending,
+            remainingBudget = totalBudget - approvedSpending,
+        )
+    }
 }

@@ -8,6 +8,7 @@ import com.moasem.backend.domain.event.entity.Event
 import com.moasem.backend.domain.event.entity.EventStatus
 import com.moasem.backend.domain.event.repository.EventRepository
 import com.moasem.backend.domain.event.repository.BudgetAdditionRepository
+import com.moasem.backend.domain.event.service.port.ApprovedSpendingTotalProvider
 import com.moasem.backend.domain.event.service.port.GroupAccessProvider
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
@@ -17,6 +18,7 @@ class EventService(
     private val eventRepository: EventRepository,
     private val budgetAdditionRepository: BudgetAdditionRepository,
     private val groupAccessProvider: GroupAccessProvider,
+    private val approvedSpendingTotalProvider: ApprovedSpendingTotalProvider,
 ) {
 
     @Transactional
@@ -31,7 +33,11 @@ class EventService(
             initialBudget = request.initialBudget,
         )
 
-        return EventConverter.toDetailResponse(eventRepository.save(event), additionalBudget = 0L)
+        return EventConverter.toDetailResponse(
+            event = eventRepository.save(event),
+            additionalBudget = 0L,
+            approvedSpending = 0L,
+        )
     }
 
     @Transactional(readOnly = true)
@@ -50,8 +56,10 @@ class EventService(
         validateGroupMember(groupId, currentUserId)
         val event = eventRepository.findByIdAndGroupIdAndDeletedAtIsNull(eventId, groupId)
             ?: throw NoSuchElementException("행사를 찾을 수 없습니다. eventId=$eventId")
-        val additionalBudget = budgetAdditionRepository.sumAmountByEventId(event.id!!)
-        return EventConverter.toDetailResponse(event, additionalBudget)
+        val persistedEventId = event.id ?: error("저장되지 않은 행사는 조회할 수 없습니다.")
+        val additionalBudget = budgetAdditionRepository.sumAmountByEventId(persistedEventId)
+        val approvedSpending = approvedSpendingTotalProvider.getApprovedSpendingTotal(persistedEventId)
+        return EventConverter.toDetailResponse(event, additionalBudget, approvedSpending)
     }
 
     private fun validateGroupOwner(groupId: Long, userId: Long) {

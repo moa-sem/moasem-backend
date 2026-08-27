@@ -26,4 +26,6 @@ data class EventDetailResponse(
     val initialBudget: Long,
     val additionalBudget: Long,
     val totalBudget: Long,
+    val approvedSpending: Long,
+    val remainingBudget: Long,
 )
