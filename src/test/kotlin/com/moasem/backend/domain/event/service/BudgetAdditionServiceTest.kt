@@ -32,7 +32,7 @@ class BudgetAdditionServiceTest {
         every { groupAccessProvider.existsGroup(GROUP_ID) } returns true
         every { groupAccessProvider.isMember(GROUP_ID, OWNER_ID) } returns true
         every { groupAccessProvider.isOwner(GROUP_ID, OWNER_ID) } returns true
-        every { eventRepository.findByIdAndGroupId(EVENT_ID, GROUP_ID) } returns event(EVENT_ID)
+        every { eventRepository.findByIdAndGroupIdAndDeletedAtIsNull(EVENT_ID, GROUP_ID) } returns event(EVENT_ID)
     }
 
     @Nested
@@ -97,7 +97,7 @@ class BudgetAdditionServiceTest {
 
         @Test
         fun `존재하지 않는 행사에는 추가 예산을 등록할 수 없다`() {
-            every { eventRepository.findByIdAndGroupId(EVENT_ID, GROUP_ID) } returns null
+            every { eventRepository.findByIdAndGroupIdAndDeletedAtIsNull(EVENT_ID, GROUP_ID) } returns null
 
             assertThatThrownBy { budgetAdditionService.addBudgetAddition(GROUP_ID, EVENT_ID, OWNER_ID, request()) }
                 .isInstanceOf(NoSuchElementException::class.java)
@@ -108,7 +108,7 @@ class BudgetAdditionServiceTest {
 
         @Test
         fun `다른 모임에 속한 행사에는 추가 예산을 등록할 수 없다`() {
-            every { eventRepository.findByIdAndGroupId(EVENT_ID, GROUP_ID) } returns null
+            every { eventRepository.findByIdAndGroupIdAndDeletedAtIsNull(EVENT_ID, GROUP_ID) } returns null
 
             assertThatThrownBy { budgetAdditionService.addBudgetAddition(GROUP_ID, EVENT_ID, OWNER_ID, request()) }
                 .isInstanceOf(NoSuchElementException::class.java)
@@ -118,11 +118,23 @@ class BudgetAdditionServiceTest {
 
         @Test
         fun `CLOSED 행사에는 추가 예산을 등록할 수 없다`() {
-            every { eventRepository.findByIdAndGroupId(EVENT_ID, GROUP_ID) } returns event(EVENT_ID, EventStatus.CLOSED)
+            every {
+                eventRepository.findByIdAndGroupIdAndDeletedAtIsNull(EVENT_ID, GROUP_ID)
+            } returns event(EVENT_ID, EventStatus.CLOSED)
 
             assertThatThrownBy { budgetAdditionService.addBudgetAddition(GROUP_ID, EVENT_ID, OWNER_ID, request()) }
                 .isInstanceOf(IllegalStateException::class.java)
                 .hasMessageContaining("진행 중인 행사")
+
+            verify(exactly = 0) { budgetAdditionRepository.save(any()) }
+        }
+
+        @Test
+        fun `논리 삭제된 행사에는 추가 예산을 등록할 수 없다`() {
+            every { eventRepository.findByIdAndGroupIdAndDeletedAtIsNull(EVENT_ID, GROUP_ID) } returns null
+
+            assertThatThrownBy { budgetAdditionService.addBudgetAddition(GROUP_ID, EVENT_ID, OWNER_ID, request()) }
+                .isInstanceOf(NoSuchElementException::class.java)
 
             verify(exactly = 0) { budgetAdditionRepository.save(any()) }
         }
