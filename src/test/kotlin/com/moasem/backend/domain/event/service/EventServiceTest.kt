@@ -4,6 +4,7 @@ import com.moasem.backend.domain.event.dto.CreateEventRequest
 import com.moasem.backend.domain.event.entity.Event
 import com.moasem.backend.domain.event.entity.EventStatus
 import com.moasem.backend.domain.event.repository.EventRepository
+import com.moasem.backend.domain.event.repository.BudgetAdditionRepository
 import com.moasem.backend.domain.event.service.port.GroupAccessProvider
 import io.mockk.every
 import io.mockk.mockk
@@ -20,15 +21,17 @@ import java.time.LocalDateTime
 class EventServiceTest {
 
     private val eventRepository = mockk<EventRepository>()
+    private val budgetAdditionRepository = mockk<BudgetAdditionRepository>()
     private val groupAccessProvider = mockk<GroupAccessProvider>()
     private lateinit var eventService: EventService
 
     @BeforeEach
     fun setUp() {
-        eventService = EventService(eventRepository, groupAccessProvider)
+        eventService = EventService(eventRepository, budgetAdditionRepository, groupAccessProvider)
         every { groupAccessProvider.existsGroup(GROUP_ID) } returns true
         every { groupAccessProvider.isMember(GROUP_ID, OWNER_ID) } returns true
         every { groupAccessProvider.isOwner(GROUP_ID, OWNER_ID) } returns true
+        every { budgetAdditionRepository.sumAmountByEventId(EVENT_ID) } returns 0L
     }
 
     @Nested
@@ -192,6 +195,20 @@ class EventServiceTest {
 
             assertThat(response.eventId).isEqualTo(EVENT_ID)
             assertThat(response.groupId).isEqualTo(GROUP_ID)
+            assertThat(response.additionalBudget).isZero()
+            assertThat(response.totalBudget).isEqualTo(500_000L)
+        }
+
+        @Test
+        fun `최초 예산과 추가 예산을 합산한 총예산을 조회한다`() {
+            every { eventRepository.findByIdAndGroupId(EVENT_ID, GROUP_ID) } returns event(EVENT_ID)
+            every { budgetAdditionRepository.sumAmountByEventId(EVENT_ID) } returns 150_000L
+
+            val response = eventService.getEvent(GROUP_ID, EVENT_ID, OWNER_ID)
+
+            assertThat(response.initialBudget).isEqualTo(500_000L)
+            assertThat(response.additionalBudget).isEqualTo(150_000L)
+            assertThat(response.totalBudget).isEqualTo(650_000L)
         }
 
         @Test
