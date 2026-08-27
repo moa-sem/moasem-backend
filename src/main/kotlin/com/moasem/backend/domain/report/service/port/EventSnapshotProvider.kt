@@ -49,6 +49,7 @@ data class EventSnapshotData(
 data class BudgetAdditionData(
     val amount: Long,
     val reason: String,
+    val addedBy: String,
     val addedAt: LocalDateTime,
 )
 
@@ -57,6 +58,13 @@ data class ApprovedSpendingData(
     val description: String,
     val amount: Long,
     val tag: String,
+    /**
+     * 태그의 표시용 한글 라벨.
+     *
+     * 태그 분류 체계는 spending 도메인이 소유하므로 제공자가 라벨까지 함께 넘긴다.
+     * report가 자체 매핑을 들고 있으면 spending 쪽에서 라벨이 바뀌었을 때 조용히 어긋난다.
+     */
+    val tagLabel: String,
     val payerName: String,
     val spentAt: LocalDateTime,
     val receiptUrl: String?,
