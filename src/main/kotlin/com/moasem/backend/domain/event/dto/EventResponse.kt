@@ -24,4 +24,6 @@ data class EventDetailResponse(
     val endAt: LocalDateTime,
     val status: EventStatus,
     val initialBudget: Long,
+    val additionalBudget: Long,
+    val totalBudget: Long,
 )
