@@ -4,10 +4,12 @@ import com.moasem.backend.domain.spending.dto.CreateSpendingRequest
 import com.moasem.backend.domain.spending.dto.EvidenceDownloadUrlResponse
 import com.moasem.backend.domain.spending.dto.EvidenceUploadUrlRequest
 import com.moasem.backend.domain.spending.dto.EvidenceUploadUrlResponse
+import com.moasem.backend.domain.spending.dto.RejectSpendingRequest
 import com.moasem.backend.domain.spending.dto.SpendingDetailResponse
 import com.moasem.backend.domain.spending.dto.SpendingListResponse
 import com.moasem.backend.domain.spending.dto.UpdateSpendingRequest
 import com.moasem.backend.domain.spending.entity.SpendingStatus
+import com.moasem.backend.domain.spending.service.SpendingApprovalService
 import com.moasem.backend.domain.spending.service.SpendingService
 import io.swagger.v3.oas.annotations.Operation
 import io.swagger.v3.oas.annotations.tags.Tag
@@ -33,6 +35,7 @@ import java.net.URI
 @RequestMapping("/api/v1/events/{eventId}/spendings")
 class SpendingController(
     private val spendingService: SpendingService,
+    private val spendingApprovalService: SpendingApprovalService,
 ) {
 
     @Operation(
@@ -106,6 +109,28 @@ class SpendingController(
         authentication: Authentication,
     ): ResponseEntity<EvidenceDownloadUrlResponse> =
         ResponseEntity.ok(spendingService.issueEvidenceDownloadUrl(eventId, spendingId, authentication.userId()))
+
+    @Operation(
+        summary = "지출 승인",
+        description = "모임장이 PENDING 지출을 승인한다. 승인 후 잔여 예산이 음수가 되어도 승인 자체는 허용한다.",
+    )
+    @PatchMapping("/{spendingId}/approval")
+    fun approveSpending(
+        @PathVariable eventId: Long,
+        @PathVariable spendingId: Long,
+        authentication: Authentication,
+    ): ResponseEntity<SpendingDetailResponse> =
+        ResponseEntity.ok(spendingApprovalService.approve(eventId, spendingId, authentication.userId()))
+
+    @Operation(summary = "지출 반려", description = "모임장이 PENDING 지출을 반려한다. 반려 사유는 필수다.")
+    @PatchMapping("/{spendingId}/rejection")
+    fun rejectSpending(
+        @PathVariable eventId: Long,
+        @PathVariable spendingId: Long,
+        authentication: Authentication,
+        @Valid @RequestBody request: RejectSpendingRequest,
+    ): ResponseEntity<SpendingDetailResponse> =
+        ResponseEntity.ok(spendingApprovalService.reject(eventId, spendingId, authentication.userId(), request))
 
     /**
      * 인증 주체에서 사용자 ID를 읽는다.
