@@ -2,6 +2,8 @@ package com.moasem.backend.domain.report.service
 
 import com.moasem.backend.domain.report.entity.ReportSnapshot
 import com.moasem.backend.domain.report.service.port.EventSnapshotData
+import com.moasem.backend.global.error.BusinessException
+import com.moasem.backend.global.error.ErrorCode
 import org.springframework.stereotype.Component
 
 /**
@@ -14,8 +16,11 @@ import org.springframework.stereotype.Component
 class ReportSnapshotCalculator {
 
     fun calculate(data: EventSnapshotData): ReportSnapshot {
-        check(data.status == CLOSED_STATUS) {
-            "마감된 행사만 결산할 수 있습니다. 현재 상태: ${data.status}"
+        if (data.status != CLOSED_STATUS) {
+            throw BusinessException(
+                ErrorCode.EVENT_NOT_CLOSED,
+                "마감된 행사만 결산할 수 있습니다. 현재 상태: ${data.status}",
+            )
         }
 
         val totalBudget = data.initialBudget + data.budgetAdditions.sumOf { it.amount }
