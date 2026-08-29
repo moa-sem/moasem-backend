@@ -4,6 +4,7 @@ import com.moasem.backend.domain.report.service.port.FakeEventSnapshotProvider.C
 import com.moasem.backend.domain.report.service.port.FakeEventSnapshotProvider.Companion.sampleAddition
 import com.moasem.backend.domain.report.service.port.FakeEventSnapshotProvider.Companion.sampleData
 import com.moasem.backend.domain.report.service.port.FakeEventSnapshotProvider.Companion.sampleSpending
+import com.moasem.backend.global.error.BusinessException
 import org.assertj.core.api.Assertions.assertThat
 import org.assertj.core.api.Assertions.assertThatThrownBy
 import org.junit.jupiter.api.DisplayName
@@ -198,7 +199,7 @@ class ReportSnapshotCalculatorTest {
         @Test
         fun `마감되지 않은 행사는 결산할 수 없다`() {
             assertThatThrownBy { calculator.calculate(sampleData(status = "ACTIVE")) }
-                .isInstanceOf(IllegalStateException::class.java)
+                .isInstanceOf(BusinessException::class.java)
                 .hasMessageContaining("마감된 행사만")
         }
     }

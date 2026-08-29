@@ -9,6 +9,8 @@ import com.moasem.backend.domain.report.service.port.ReportAiClient
 import com.moasem.backend.domain.report.service.port.ReportAiException
 import com.moasem.backend.domain.report.service.port.ReportFileStorage
 import com.moasem.backend.domain.report.service.port.TagTotalData
+import com.moasem.backend.global.error.BusinessException
+import com.moasem.backend.global.error.ErrorCode
 import org.slf4j.LoggerFactory
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
@@ -35,12 +37,12 @@ class ReportGenerationService(
     /**
      * 행사 마감 직후 호출한다. 보고서를 만들고 파일까지 저장한다.
      *
-     * @throws IllegalStateException 이미 보고서가 있거나 마감되지 않은 행사인 경우
+     * @throws BusinessException 이미 보고서가 있거나 마감되지 않은 행사인 경우
      */
     @Transactional
     fun generate(eventId: Long): Report {
-        check(!reportRepository.existsByEventId(eventId)) {
-            "이미 보고서가 존재하는 행사입니다. eventId=$eventId"
+        if (reportRepository.existsByEventId(eventId)) {
+            throw BusinessException(ErrorCode.REPORT_ALREADY_EXISTS)
         }
 
         // 스냅샷을 먼저 확정한 뒤에 보고서 행을 만든다. 마감되지 않은 행사처럼 사전 조건을
@@ -64,10 +66,13 @@ class ReportGenerationService(
     @Transactional
     fun retry(eventId: Long): Report {
         val report = reportRepository.findByEventId(eventId)
-            ?: throw NoSuchElementException("보고서를 찾을 수 없습니다. eventId=$eventId")
+            ?: throw BusinessException(ErrorCode.REPORT_NOT_FOUND)
 
-        check(report.status.isRetryable) {
-            "재시도할 수 없는 상태입니다. 현재 상태: ${report.status}"
+        if (!report.status.isRetryable) {
+            throw BusinessException(
+                ErrorCode.REPORT_NOT_RETRYABLE,
+                "재시도할 수 없는 상태입니다. 현재 상태: ${report.status}",
+            )
         }
 
         // 보고서 행은 스냅샷 확정 이후에만 만들어지므로 여기서 snapshot은 항상 존재한다.

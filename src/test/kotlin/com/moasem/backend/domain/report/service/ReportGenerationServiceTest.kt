@@ -9,6 +9,8 @@ import com.moasem.backend.domain.report.service.port.FakeEventSnapshotProvider.C
 import com.moasem.backend.domain.report.service.port.FakeEventSnapshotProvider.Companion.sampleSpending
 import com.moasem.backend.domain.report.service.port.FakeReportAiClient
 import com.moasem.backend.domain.report.service.port.FakeReportFileStorage
+import com.moasem.backend.global.error.BusinessException
+import com.moasem.backend.global.error.ErrorCode
 import io.mockk.every
 import io.mockk.mockk
 import io.mockk.slot
@@ -187,14 +189,14 @@ class ReportGenerationServiceTest {
             service.generate(EVENT_ID)
 
             assertThatThrownBy { service.retry(EVENT_ID) }
-                .isInstanceOf(IllegalStateException::class.java)
+                .isInstanceOf(BusinessException::class.java)
                 .hasMessageContaining("재시도할 수 없는 상태")
         }
 
         @Test
         fun `없는 보고서는 재시도할 수 없다`() {
             assertThatThrownBy { service.retry(999L) }
-                .isInstanceOf(NoSuchElementException::class.java)
+                .isInstanceOf(BusinessException::class.java)
         }
     }
 
@@ -207,8 +209,8 @@ class ReportGenerationServiceTest {
             service.generate(EVENT_ID)
 
             assertThatThrownBy { service.generate(EVENT_ID) }
-                .isInstanceOf(IllegalStateException::class.java)
-                .hasMessageContaining("이미 보고서가 존재")
+                .isInstanceOf(BusinessException::class.java)
+                .hasFieldOrPropertyWithValue("errorCode", ErrorCode.REPORT_ALREADY_EXISTS)
         }
 
         @Test
@@ -217,8 +219,8 @@ class ReportGenerationServiceTest {
             snapshotProvider.given(sampleData(eventId = EVENT_ID, status = "ACTIVE"))
 
             assertThatThrownBy { service.generate(EVENT_ID) }
-                .isInstanceOf(IllegalStateException::class.java)
-                .hasMessageContaining("마감된 행사만")
+                .isInstanceOf(BusinessException::class.java)
+                .hasFieldOrPropertyWithValue("errorCode", ErrorCode.EVENT_NOT_CLOSED)
 
             // FAILED 행이 남으면 나중에 행사가 실제로 마감돼도 event_id unique 제약 때문에
             // 새 보고서를 만들 수 없다. 행 자체가 생기지 않아야 한다.
@@ -230,7 +232,7 @@ class ReportGenerationServiceTest {
         fun generatesAfterEventIsClosed() {
             snapshotProvider.given(sampleData(eventId = EVENT_ID, status = "ACTIVE"))
             assertThatThrownBy { service.generate(EVENT_ID) }
-                .isInstanceOf(IllegalStateException::class.java)
+                .isInstanceOf(BusinessException::class.java)
 
             snapshotProvider.given(sampleData(eventId = EVENT_ID, status = "CLOSED"))
 
