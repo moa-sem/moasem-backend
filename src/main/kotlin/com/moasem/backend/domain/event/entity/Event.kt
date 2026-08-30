@@ -50,12 +50,29 @@ class Event protected constructor(
     var deletedAt: LocalDateTime? = null
         protected set
 
+    @Column(name = "participant_count")
+    var participantCount: Int? = null
+        protected set
+
+    @Column(name = "closed_at")
+    var closedAt: LocalDateTime? = null
+        protected set
+
     val isDeleted: Boolean
         get() = deletedAt != null
 
     fun delete(deletedAt: LocalDateTime = LocalDateTime.now()) {
         check(!isDeleted) { "이미 삭제된 행사입니다." }
         this.deletedAt = deletedAt
+    }
+
+    fun close(participantCount: Int) {
+        check(status == EventStatus.ACTIVE) { "진행 중인 행사만 마감할 수 있습니다." }
+        require(participantCount >= 1) { "행사 참여 인원은 1명 이상이어야 합니다." }
+
+        status = EventStatus.CLOSED
+        this.participantCount = participantCount
+        closedAt = LocalDateTime.now()
     }
 
     companion object {
