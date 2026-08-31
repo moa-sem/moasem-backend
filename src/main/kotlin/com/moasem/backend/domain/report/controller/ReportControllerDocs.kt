@@ -1,6 +1,7 @@
 package com.moasem.backend.domain.report.controller
 
 import com.moasem.backend.domain.report.dto.ReportDetailResponse
+import com.moasem.backend.domain.report.dto.ReportDownloadResponse
 import com.moasem.backend.domain.report.dto.ReportStatusResponse
 import com.moasem.backend.global.response.ApiResponse
 import io.swagger.v3.oas.annotations.Operation
@@ -71,4 +72,55 @@ interface ReportControllerDocs {
         @Parameter(description = "현재 로그인 사용자 ID. auth 완성 전까지 임시로 헤더로 받는다", example = "42")
         currentUserId: Long,
     ): ApiResponse<ReportStatusResponse>
+
+    @Operation(
+        summary = "PDF 다운로드 URL 발급",
+        description = """
+            보고서 PDF를 내려받을 수 있는 URL을 발급한다.
+
+            서버가 파일을 중계하지 않고 S3 presigned URL을 내려준다. 앱은 이 URL로 직접 받는다.
+            발급된 URL은 그 자체가 통행증이라 만료 전까지는 링크를 아는 누구나 내려받을 수 있으므로,
+            앱은 받은 즉시 사용하고 저장하거나 공유하지 않는다.
+
+            생성이 완료된 보고서만 발급된다. 진행 상태는 상태 조회 API로 먼저 확인한다.
+        """,
+    )
+    @ApiResponses(
+        SwaggerResponse(responseCode = "200", description = "발급 성공"),
+        SwaggerResponse(responseCode = "403", description = "모임 구성원이 아님 (NOT_GROUP_MEMBER)"),
+        SwaggerResponse(responseCode = "404", description = "보고서 없음 (REPORT_NOT_FOUND)"),
+        SwaggerResponse(
+            responseCode = "409",
+            description = "아직 다운로드할 수 없음 (REPORT_NOT_DOWNLOADABLE). 생성 중이거나 실패한 상태다",
+        ),
+    )
+    fun getPdfDownload(
+        @Parameter(description = "행사 ID", example = "1") eventId: Long,
+        @Parameter(description = "현재 로그인 사용자 ID. auth 완성 전까지 임시로 헤더로 받는다", example = "42")
+        currentUserId: Long,
+    ): ApiResponse<ReportDownloadResponse>
+
+    @Operation(
+        summary = "CSV 다운로드 URL 발급",
+        description = """
+            보고서 CSV를 내려받을 수 있는 URL을 발급한다. 발급 방식은 PDF와 같다.
+
+            CSV는 엑셀에서 다시 가공하는 용도라 요약과 지출 내역만 담기며, AI 분석은 포함되지 않는다.
+            따라서 AI 분석이 실패한 보고서도 CSV는 온전하다.
+        """,
+    )
+    @ApiResponses(
+        SwaggerResponse(responseCode = "200", description = "발급 성공"),
+        SwaggerResponse(responseCode = "403", description = "모임 구성원이 아님 (NOT_GROUP_MEMBER)"),
+        SwaggerResponse(responseCode = "404", description = "보고서 없음 (REPORT_NOT_FOUND)"),
+        SwaggerResponse(
+            responseCode = "409",
+            description = "아직 다운로드할 수 없음 (REPORT_NOT_DOWNLOADABLE)",
+        ),
+    )
+    fun getCsvDownload(
+        @Parameter(description = "행사 ID", example = "1") eventId: Long,
+        @Parameter(description = "현재 로그인 사용자 ID. auth 완성 전까지 임시로 헤더로 받는다", example = "42")
+        currentUserId: Long,
+    ): ApiResponse<ReportDownloadResponse>
 }

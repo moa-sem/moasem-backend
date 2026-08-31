@@ -3,10 +3,12 @@ package com.moasem.backend.domain.report.controller
 import com.moasem.backend.domain.report.dto.BudgetSummaryResponse
 import com.moasem.backend.domain.report.dto.EventSummaryResponse
 import com.moasem.backend.domain.report.dto.ReportDetailResponse
+import com.moasem.backend.domain.report.dto.ReportDownloadResponse
 import com.moasem.backend.domain.report.dto.ReportStatusResponse
 import com.moasem.backend.domain.report.dto.TagTotalResponse
 import com.moasem.backend.domain.report.entity.AiAnalysisStatus
 import com.moasem.backend.domain.report.entity.ReportStatus
+import com.moasem.backend.domain.report.service.ReportDownloadService
 import com.moasem.backend.domain.report.service.ReportQueryService
 import com.moasem.backend.global.error.BusinessException
 import com.moasem.backend.global.error.ErrorCode
@@ -35,6 +37,9 @@ class ReportControllerTest {
 
     @MockkBean
     private lateinit var reportQueryService: ReportQueryService
+
+    @MockkBean
+    private lateinit var reportDownloadService: ReportDownloadService
 
     @Test
     @DisplayName("보고서를 조회하면 공통 응답으로 감싸서 반환한다")
@@ -110,6 +115,33 @@ class ReportControllerTest {
     fun missingUserHeader() {
         mockMvc.perform(get("/api/v1/events/$EVENT_ID/report"))
             .andExpect(status().isBadRequest)
+    }
+
+    @Test
+    @DisplayName("PDF 다운로드 URL을 발급한다")
+    fun getPdfDownload() {
+        every { reportDownloadService.getPdfDownload(EVENT_ID, USER_ID) } returns
+            ReportDownloadResponse(
+                downloadUrl = "https://s3.example/reports/1/report.pdf?sig=x",
+                fileName = "여름_MT_결산보고서.pdf",
+                expiresAt = LocalDateTime.of(2026, 8, 24, 10, 5),
+            )
+
+        mockMvc.perform(get("/api/v1/events/$EVENT_ID/report/pdf").header("X-User-Id", USER_ID))
+            .andExpect(status().isOk)
+            .andExpect(jsonPath("$.data.downloadUrl").value("https://s3.example/reports/1/report.pdf?sig=x"))
+            .andExpect(jsonPath("$.data.fileName").value("여름_MT_결산보고서.pdf"))
+    }
+
+    @Test
+    @DisplayName("생성이 끝나지 않은 보고서는 409")
+    fun downloadNotReady() {
+        every { reportDownloadService.getCsvDownload(EVENT_ID, USER_ID) } throws
+            BusinessException(ErrorCode.REPORT_NOT_DOWNLOADABLE)
+
+        mockMvc.perform(get("/api/v1/events/$EVENT_ID/report/csv").header("X-User-Id", USER_ID))
+            .andExpect(status().isConflict)
+            .andExpect(jsonPath("$.code").value("REPORT_NOT_DOWNLOADABLE"))
     }
 
     private fun detailResponse(
