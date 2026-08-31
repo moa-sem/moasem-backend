@@ -1,7 +1,9 @@
 package com.moasem.backend.domain.report.controller
 
 import com.moasem.backend.domain.report.dto.ReportDetailResponse
+import com.moasem.backend.domain.report.dto.ReportDownloadResponse
 import com.moasem.backend.domain.report.dto.ReportStatusResponse
+import com.moasem.backend.domain.report.service.ReportDownloadService
 import com.moasem.backend.domain.report.service.ReportQueryService
 import com.moasem.backend.global.response.ApiResponse
 import org.springframework.web.bind.annotation.GetMapping
@@ -23,6 +25,7 @@ import org.springframework.web.bind.annotation.RestController
 @RequestMapping("/api/v1/events/{eventId}/report")
 class ReportController(
     private val reportQueryService: ReportQueryService,
+    private val reportDownloadService: ReportDownloadService,
 ) : ReportControllerDocs {
 
     @GetMapping
@@ -38,6 +41,20 @@ class ReportController(
         @RequestHeader(USER_ID_HEADER) currentUserId: Long,
     ): ApiResponse<ReportStatusResponse> =
         ApiResponse.success(reportQueryService.getStatus(eventId, currentUserId))
+
+    @GetMapping("/pdf")
+    override fun getPdfDownload(
+        @PathVariable eventId: Long,
+        @RequestHeader(USER_ID_HEADER) currentUserId: Long,
+    ): ApiResponse<ReportDownloadResponse> =
+        ApiResponse.success(reportDownloadService.getPdfDownload(eventId, currentUserId))
+
+    @GetMapping("/csv")
+    override fun getCsvDownload(
+        @PathVariable eventId: Long,
+        @RequestHeader(USER_ID_HEADER) currentUserId: Long,
+    ): ApiResponse<ReportDownloadResponse> =
+        ApiResponse.success(reportDownloadService.getCsvDownload(eventId, currentUserId))
 
     companion object {
         const val USER_ID_HEADER = "X-User-Id"
