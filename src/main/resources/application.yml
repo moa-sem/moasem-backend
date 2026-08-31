@@ -49,6 +49,13 @@ logging:
   level:
     com.moasem: debug
 
+# 로컬에는 S3가 없어 보고서 파일을 디스크에 두고 앱이 직접 서빙한다.
+# build/ 아래라 gradlew clean 시 함께 지워진다.
+moasem:
+  local-storage:
+    dir: build/local-report-files
+    base-url: http://localhost:8080
+
 ---
 spring:
   config:

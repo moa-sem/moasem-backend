@@ -5,6 +5,7 @@ import com.moasem.backend.domain.report.entity.ReportSnapshot
 import jakarta.persistence.EntityManager
 import org.assertj.core.api.Assertions.assertThat
 import org.assertj.core.api.Assertions.assertThatThrownBy
+import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.DisplayName
 import org.junit.jupiter.api.Test
 import org.springframework.beans.factory.annotation.Autowired
@@ -18,6 +19,18 @@ class ReportRepositoryTest @Autowired constructor(
     private val reportRepository: ReportRepository,
     private val entityManager: EntityManager,
 ) {
+
+    /**
+     * 이미 들어 있는 보고서를 비우고 시작한다.
+     *
+     * 테스트에 별도 프로파일이 없어 개발자의 로컬 개발 DB를 그대로 쓴다. 앱을 띄워
+     * 보고서를 만들어 둔 상태면 event_id unique 제약에 걸려 테스트가 깨진다.
+     * @DataJpaTest는 각 테스트를 롤백하므로 이 삭제도 되돌려진다. 실제 데이터는 남는다.
+     */
+    @BeforeEach
+    fun clear() {
+        reportRepository.deleteAllInBatch()
+    }
 
     @Test
     @DisplayName("결산 스냅샷이 JSONB로 저장되고 그대로 복원된다")
