@@ -9,6 +9,13 @@ spring:
         # Kotlin data class와 java.time 타입을 JSONB로 매핑하기 위한 커스텀 FormatMapper
         type.json_format_mapper: com.moasem.backend.global.config.KotlinJsonFormatMapper
 
+moasem:
+  s3:
+    # 자격증명은 여기 두지 않는다. AWS SDK 기본 제공자 체인이 찾는다
+    # (EC2는 IAM 역할, 로컬은 AWS_ACCESS_KEY_ID / AWS_SECRET_ACCESS_KEY 환경변수).
+    bucket: ${S3_BUCKET:moasem-backend-storage}
+    region: ${AWS_REGION:ap-northeast-2}
+
 springdoc:
   api-docs:
     path: /v3/api-docs
