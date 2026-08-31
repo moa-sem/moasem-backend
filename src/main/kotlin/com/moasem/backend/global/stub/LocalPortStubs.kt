@@ -7,6 +7,7 @@ import com.moasem.backend.domain.event.service.port.SpendingHistoryProvider
 import com.moasem.backend.domain.report.service.port.AiAnalysisInput
 import com.moasem.backend.domain.report.service.port.EventSnapshotData
 import com.moasem.backend.domain.report.service.port.EventSnapshotProvider
+import com.moasem.backend.domain.report.service.port.GroupMembershipProvider
 import com.moasem.backend.domain.report.service.port.ReportAiClient
 import org.springframework.boot.autoconfigure.condition.ConditionalOnMissingBean
 import org.springframework.context.annotation.Bean
@@ -37,6 +38,12 @@ class LocalPortStubs {
         override fun existsGroup(groupId: Long) = true
         override fun isMember(groupId: Long, userId: Long) = true
         override fun isOwner(groupId: Long, userId: Long) = true
+    }
+
+    @Bean
+    @ConditionalOnMissingBean(GroupMembershipProvider::class)
+    fun stubGroupMembershipProvider() = object : GroupMembershipProvider {
+        override fun isMember(groupId: Long, userId: Long) = true
     }
 
     @Bean
