@@ -22,13 +22,13 @@ import org.springframework.context.annotation.Profile
  * 방법이 없어 임시로 둔다.
  *
  * 안전장치 두 가지를 걸어 둔다.
- * - `@Profile("local")` — 운영(prod) 프로파일에서는 등록되지 않는다.
+ * - `@Profile("!prod")` — 운영 프로파일에서는 등록되지 않는다. 로컬과 테스트에서만 뜬다.
  * - `@ConditionalOnMissingBean` — 실제 어댑터가 생기면 그쪽이 우선한다. 담당자가 구현을
  *   추가할 때 이 파일을 건드리지 않아도 되고, 충돌도 나지 않는다.
  *
  * 실제 어댑터가 모두 채워지면 이 파일은 삭제한다.
  */
-@Profile("local")
+@Profile("!prod")
 @Configuration
 class LocalPortStubs {
 
