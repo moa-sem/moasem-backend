@@ -5,6 +5,7 @@ import org.slf4j.LoggerFactory
 import org.springframework.http.ResponseEntity
 import org.springframework.web.HttpRequestMethodNotSupportedException
 import org.springframework.web.bind.MethodArgumentNotValidException
+import org.springframework.web.bind.MissingRequestHeaderException
 import org.springframework.web.bind.MissingServletRequestParameterException
 import org.springframework.web.bind.annotation.ExceptionHandler
 import org.springframework.web.bind.annotation.RestControllerAdvice
@@ -52,6 +53,11 @@ class GlobalExceptionHandler {
     @ExceptionHandler(MissingServletRequestParameterException::class)
     fun handleMissingParameter(e: MissingServletRequestParameterException): ResponseEntity<ApiResponse<Unit>> =
         respond(ErrorCode.MISSING_REQUEST_PARAMETER, "'${e.parameterName}' 파라미터가 필요합니다.")
+
+    /** 필수 헤더 누락. 클라이언트 실수이므로 500이 아니라 400으로 알려야 한다. */
+    @ExceptionHandler(MissingRequestHeaderException::class)
+    fun handleMissingHeader(e: MissingRequestHeaderException): ResponseEntity<ApiResponse<Unit>> =
+        respond(ErrorCode.MISSING_REQUEST_PARAMETER, "'${e.headerName}' 헤더가 필요합니다.")
 
     @ExceptionHandler(HttpRequestMethodNotSupportedException::class)
     fun handleMethodNotSupported(e: HttpRequestMethodNotSupportedException): ResponseEntity<ApiResponse<Unit>> =
