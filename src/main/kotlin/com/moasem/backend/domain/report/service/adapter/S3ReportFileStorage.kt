@@ -2,6 +2,7 @@ package com.moasem.backend.domain.report.service.adapter
 
 import com.moasem.backend.domain.report.service.port.ReportFileStorage
 import com.moasem.backend.global.config.S3Properties
+import org.springframework.context.annotation.Profile
 import org.springframework.stereotype.Component
 import software.amazon.awssdk.core.sync.RequestBody
 import software.amazon.awssdk.services.s3.S3Client
@@ -16,7 +17,11 @@ import java.time.Duration
  *
  * 다운로드는 서버가 파일을 중계하지 않고 presigned URL을 내려 앱이 S3에서 직접 받는다.
  * 서버 메모리·대역폭을 쓰지 않고, 모바일에서 자주 발생하는 연결 끊김 재개도 S3가 처리한다.
+ *
+ * 로컬에서는 AWS 자격증명 없이 개발할 수 있도록
+ * [com.moasem.backend.domain.report.service.adapter.LocalReportFileStorage]가 대신 쓰인다.
  */
+@Profile("!local")
 @Component
 class S3ReportFileStorage(
     private val s3Client: S3Client,

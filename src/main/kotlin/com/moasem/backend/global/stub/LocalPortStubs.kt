@@ -69,6 +69,9 @@ class LocalPortStubs {
      *
      * 없는 값을 지어내면 잘못된 금액이 스냅샷에 확정 저장되고, 스냅샷은 불변이라 되돌릴 수
      * 없다. 아직 연결되지 않았다는 사실이 드러나는 편이 낫다.
+     *
+     * 로컬에서는 [com.moasem.backend.global.dev.DevEventSnapshotStore]가 대신 등록된다.
+     * 그쪽도 개발자가 명시적으로 요청한 행사에만 샘플을 만들어 준다.
      */
     @Bean
     @ConditionalOnMissingBean(EventSnapshotProvider::class)
