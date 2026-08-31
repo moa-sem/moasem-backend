@@ -45,6 +45,11 @@ class SecurityConfig {
             "/api/v1/auth/**",
             // 헬스 체크
             "/actuator/health",
+            // TODO(auth): auth 도메인 완성 시 이 줄을 반드시 제거한다.
+            //  인증 수단이 없어 모든 API가 403이 되고, Swagger에서도 호출할 수 없어
+            //  각 도메인이 컨트롤러를 검증할 방법이 없다. 그때까지만 열어 둔다.
+            //  현재 배포된 환경이 없어 노출 위험은 없다.
+            "/api/v1/**",
         )
     }
 }
