@@ -7,6 +7,8 @@ import org.springframework.data.domain.Pageable
 import jakarta.persistence.LockModeType
 import org.springframework.data.jpa.repository.JpaRepository
 import org.springframework.data.jpa.repository.Lock
+import org.springframework.data.jpa.repository.Query
+import org.springframework.data.repository.query.Param
 
 interface SpendingRepository : JpaRepository<Spending, Long> {
 
@@ -25,4 +27,27 @@ interface SpendingRepository : JpaRepository<Spending, Long> {
     fun findAllByEventId(eventId: Long, pageable: Pageable): Page<Spending>
 
     fun findAllByEventIdAndStatus(eventId: Long, status: SpendingStatus, pageable: Pageable): Page<Spending>
+
+    fun countByEventIdAndStatus(eventId: Long, status: SpendingStatus): Long
+
+    fun existsByEventId(eventId: Long): Boolean
+
+    /**
+     * 상태별 지출 합계. 해당하는 건이 없으면 null 대신 0을 돌려준다.
+     *
+     * 행사 마감 정산이 이 값을 그대로 쓰므로, 지출이 한 건도 없는 행사에서 null 처리를
+     * 호출하는 쪽에 떠넘기지 않는다.
+     */
+    @Query(
+        """
+        SELECT COALESCE(SUM(s.amount), 0)
+        FROM Spending s
+        WHERE s.eventId = :eventId
+          AND s.status = :status
+        """,
+    )
+    fun sumAmountByEventIdAndStatus(
+        @Param("eventId") eventId: Long,
+        @Param("status") status: SpendingStatus,
+    ): Long
 }
