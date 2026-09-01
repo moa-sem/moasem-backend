@@ -14,6 +14,8 @@ import com.moasem.backend.domain.spending.service.port.EventAccessProvider
 import com.moasem.backend.domain.spending.service.port.GroupAccessProvider
 import com.moasem.backend.global.storage.FakePrivateFileStorage
 import com.moasem.backend.global.storage.FileUploadPolicy
+import com.moasem.backend.global.error.ErrorCode
+import com.moasem.backend.global.error.hasErrorCode
 import io.mockk.every
 import org.springframework.data.domain.PageImpl
 import org.springframework.data.domain.PageRequest
@@ -81,8 +83,7 @@ class SpendingServiceTest {
         fun `허용하지 않는 형식은 URL을 발급하지 않는다`() {
             assertThatThrownBy {
                 spendingService.issueEvidenceUploadUrl(EVENT_ID, MEMBER_ID, uploadUrlRequest(mimeType = "image/gif"))
-            }.isInstanceOf(IllegalArgumentException::class.java)
-                .hasMessageContaining("허용하지 않는 파일 형식")
+            }.hasErrorCode(ErrorCode.UNSUPPORTED_FILE_TYPE)
 
             assertThat(fileStorage.issuedUploads).isEmpty()
         }
@@ -93,8 +94,7 @@ class SpendingServiceTest {
 
             assertThatThrownBy {
                 spendingService.issueEvidenceUploadUrl(EVENT_ID, MEMBER_ID, uploadUrlRequest(fileSize = tooLarge))
-            }.isInstanceOf(IllegalArgumentException::class.java)
-                .hasMessageContaining("파일 크기")
+            }.hasErrorCode(ErrorCode.FILE_SIZE_EXCEEDED)
 
             assertThat(fileStorage.issuedUploads).isEmpty()
         }
@@ -105,8 +105,7 @@ class SpendingServiceTest {
 
             assertThatThrownBy {
                 spendingService.issueEvidenceUploadUrl(EVENT_ID, OUTSIDER_ID, uploadUrlRequest())
-            }.isInstanceOf(IllegalStateException::class.java)
-                .hasMessageContaining("모임 구성원만")
+            }.hasErrorCode(ErrorCode.NOT_GROUP_MEMBER)
 
             assertThat(fileStorage.issuedUploads).isEmpty()
         }
@@ -170,8 +169,7 @@ class SpendingServiceTest {
                     MEMBER_ID,
                     createRequest(storageKey = evidenceKey(OUTSIDER_ID)),
                 )
-            }.isInstanceOf(IllegalArgumentException::class.java)
-                .hasMessageContaining("본인이 이 행사에서 발급받은")
+            }.hasErrorCode(ErrorCode.INVALID_EVIDENCE_KEY)
 
             verify(exactly = 0) { spendingRepository.save(any()) }
         }
@@ -184,8 +182,7 @@ class SpendingServiceTest {
                     MEMBER_ID,
                     createRequest(storageKey = "spendings/999/$MEMBER_ID/other.jpg"),
                 )
-            }.isInstanceOf(IllegalArgumentException::class.java)
-                .hasMessageContaining("본인이 이 행사에서 발급받은")
+            }.hasErrorCode(ErrorCode.INVALID_EVIDENCE_KEY)
         }
 
         @Test
@@ -193,8 +190,7 @@ class SpendingServiceTest {
             every { eventAccessProvider.findAccess(EVENT_ID) } returns activeEvent(isActive = false)
 
             assertThatThrownBy { spendingService.createSpending(EVENT_ID, MEMBER_ID, createRequest()) }
-                .isInstanceOf(IllegalStateException::class.java)
-                .hasMessageContaining("마감된 행사")
+                .hasErrorCode(ErrorCode.EVENT_ALREADY_CLOSED)
 
             verify(exactly = 0) { spendingRepository.save(any()) }
         }
@@ -205,8 +201,7 @@ class SpendingServiceTest {
 
             assertThatThrownBy {
                 spendingService.createSpending(EVENT_ID, OUTSIDER_ID, createRequest(storageKey = evidenceKey(OUTSIDER_ID)))
-            }.isInstanceOf(IllegalStateException::class.java)
-                .hasMessageContaining("모임 구성원만")
+            }.hasErrorCode(ErrorCode.NOT_GROUP_MEMBER)
         }
 
         @Test
@@ -215,7 +210,7 @@ class SpendingServiceTest {
             every { groupAccessProvider.isMember(GROUP_ID, OUTSIDER_ID) } returns false
 
             assertThatThrownBy { spendingService.createSpending(EVENT_ID, OUTSIDER_ID, createRequest()) }
-                .hasMessageContaining("모임 구성원만")
+                .hasErrorCode(ErrorCode.NOT_GROUP_MEMBER)
         }
 
         @Test
@@ -223,8 +218,7 @@ class SpendingServiceTest {
             every { eventAccessProvider.findAccess(EVENT_ID) } returns null
 
             assertThatThrownBy { spendingService.createSpending(EVENT_ID, MEMBER_ID, createRequest()) }
-                .isInstanceOf(NoSuchElementException::class.java)
-                .hasMessageContaining("행사를 찾을 수 없습니다")
+                .hasErrorCode(ErrorCode.EVENT_NOT_FOUND)
         }
     }
 
@@ -256,8 +250,7 @@ class SpendingServiceTest {
                     OUTSIDER_ID,
                     updateRequest(storageKey = evidenceKey(OUTSIDER_ID)),
                 )
-            }.isInstanceOf(IllegalStateException::class.java)
-                .hasMessageContaining("본인이 신청한 지출만")
+            }.hasErrorCode(ErrorCode.NOT_SPENDING_APPLICANT)
         }
 
         @Test
@@ -265,8 +258,7 @@ class SpendingServiceTest {
             every { spendingRepository.findByIdAndEventId(SPENDING_ID, EVENT_ID) } returns savedSpending(processed = true)
 
             assertThatThrownBy { spendingService.updateSpending(EVENT_ID, SPENDING_ID, MEMBER_ID, updateRequest()) }
-                .isInstanceOf(IllegalStateException::class.java)
-                .hasMessageContaining("PENDING")
+                .hasErrorCode(ErrorCode.SPENDING_ALREADY_HANDLED)
         }
 
         @Test
@@ -274,8 +266,7 @@ class SpendingServiceTest {
             every { spendingRepository.findByIdAndEventId(SPENDING_ID, EVENT_ID) } returns null
 
             assertThatThrownBy { spendingService.updateSpending(EVENT_ID, SPENDING_ID, MEMBER_ID, updateRequest()) }
-                .isInstanceOf(NoSuchElementException::class.java)
-                .hasMessageContaining("지출을 찾을 수 없습니다")
+                .hasErrorCode(ErrorCode.SPENDING_NOT_FOUND)
         }
 
         @Test
@@ -289,8 +280,7 @@ class SpendingServiceTest {
                     MEMBER_ID,
                     updateRequest(storageKey = evidenceKey(OUTSIDER_ID)),
                 )
-            }.isInstanceOf(IllegalArgumentException::class.java)
-                .hasMessageContaining("본인이 이 행사에서 발급받은")
+            }.hasErrorCode(ErrorCode.INVALID_EVIDENCE_KEY)
         }
     }
 
@@ -338,8 +328,7 @@ class SpendingServiceTest {
             every { groupAccessProvider.isMember(GROUP_ID, OUTSIDER_ID) } returns false
 
             assertThatThrownBy { spendingService.getSpendings(EVENT_ID, OUTSIDER_ID, null, pageable) }
-                .isInstanceOf(IllegalStateException::class.java)
-                .hasMessageContaining("모임 구성원만")
+                .hasErrorCode(ErrorCode.NOT_GROUP_MEMBER)
 
             verify(exactly = 0) { spendingRepository.findAllByEventId(any(), any()) }
         }
@@ -375,7 +364,7 @@ class SpendingServiceTest {
             every { spendingRepository.findByIdAndEventId(SPENDING_ID, EVENT_ID) } returns null
 
             assertThatThrownBy { spendingService.getSpending(EVENT_ID, SPENDING_ID, MEMBER_ID) }
-                .isInstanceOf(NoSuchElementException::class.java)
+                .hasErrorCode(ErrorCode.SPENDING_NOT_FOUND)
         }
     }
 
@@ -409,8 +398,7 @@ class SpendingServiceTest {
             every { groupAccessProvider.isMember(GROUP_ID, OUTSIDER_ID) } returns false
 
             assertThatThrownBy { spendingService.issueEvidenceDownloadUrl(EVENT_ID, SPENDING_ID, OUTSIDER_ID) }
-                .isInstanceOf(IllegalStateException::class.java)
-                .hasMessageContaining("모임 구성원만")
+                .hasErrorCode(ErrorCode.NOT_GROUP_MEMBER)
 
             assertThat(fileStorage.issuedDownloadKeys).isEmpty()
         }

@@ -1,6 +1,8 @@
 package com.moasem.backend.domain.spending.entity
 
 import com.moasem.backend.global.storage.FileUploadPolicy
+import com.moasem.backend.global.error.ErrorCode
+import com.moasem.backend.global.error.hasErrorCode
 import org.assertj.core.api.Assertions.assertThat
 import org.assertj.core.api.Assertions.assertThatThrownBy
 import org.junit.jupiter.api.DisplayName
@@ -49,15 +51,13 @@ class SpendingTest {
         @Test
         fun `JPEG PNG 외의 증빙 형식은 거부한다`() {
             assertThatThrownBy { evidence(mimeType = "application/pdf") }
-                .isInstanceOf(IllegalArgumentException::class.java)
-                .hasMessageContaining("허용하지 않는 파일 형식")
+                .hasErrorCode(ErrorCode.UNSUPPORTED_FILE_TYPE)
         }
 
         @Test
         fun `허용 용량을 넘는 증빙 파일은 거부한다`() {
             assertThatThrownBy { evidence(fileSize = FileUploadPolicy.EVIDENCE_IMAGE.maxSizeBytes + 1) }
-                .isInstanceOf(IllegalArgumentException::class.java)
-                .hasMessageContaining("파일 크기")
+                .hasErrorCode(ErrorCode.FILE_SIZE_EXCEEDED)
         }
     }
 
@@ -91,8 +91,7 @@ class SpendingTest {
 
             assertThatThrownBy {
                 spending.update(10_000L, LocalDate.of(2026, 8, 21), "사유", SpendingTag.MEAL, null, evidence())
-            }.isInstanceOf(IllegalStateException::class.java)
-                .hasMessageContaining("PENDING")
+            }.hasErrorCode(ErrorCode.SPENDING_ALREADY_HANDLED)
         }
     }
 
@@ -135,8 +134,7 @@ class SpendingTest {
             spending.approve(PROCESSOR_ID)
 
             assertThatThrownBy { spending.reject(PROCESSOR_ID, "뒤늦은 반려") }
-                .isInstanceOf(IllegalStateException::class.java)
-                .hasMessageContaining("PENDING")
+                .hasErrorCode(ErrorCode.SPENDING_ALREADY_HANDLED)
         }
     }
 

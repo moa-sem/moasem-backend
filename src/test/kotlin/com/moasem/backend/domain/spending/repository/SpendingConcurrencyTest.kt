@@ -4,6 +4,8 @@ import com.moasem.backend.domain.spending.entity.EvidenceType
 import com.moasem.backend.domain.spending.entity.Spending
 import com.moasem.backend.domain.spending.entity.SpendingStatus
 import com.moasem.backend.domain.spending.entity.SpendingTag
+import com.moasem.backend.global.error.ErrorCode
+import com.moasem.backend.global.error.hasErrorCode
 import org.assertj.core.api.Assertions.assertThat
 import org.junit.jupiter.api.AfterEach
 import org.junit.jupiter.api.DisplayName
@@ -58,7 +60,7 @@ class SpendingConcurrencyTest @Autowired constructor(
 
         assertThat(results.count { it == null }).isEqualTo(1)
         assertThat(results.filterNotNull()).singleElement()
-            .isInstanceOf(IllegalStateException::class.java)
+            .hasErrorCode(ErrorCode.SPENDING_ALREADY_HANDLED)
 
         val processed = findById(spendingId)
         assertThat(processed.status).isEqualTo(SpendingStatus.APPROVED)
