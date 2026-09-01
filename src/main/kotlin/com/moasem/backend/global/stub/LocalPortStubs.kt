@@ -9,6 +9,7 @@ import com.moasem.backend.domain.report.service.port.EventSnapshotData
 import com.moasem.backend.domain.report.service.port.EventSnapshotProvider
 import com.moasem.backend.domain.report.service.port.GroupMembershipProvider
 import com.moasem.backend.domain.report.service.port.ReportAiClient
+import com.moasem.backend.domain.spending.service.port.GroupAccessProvider as SpendingGroupAccessProvider
 import org.springframework.boot.autoconfigure.condition.ConditionalOnMissingBean
 import org.springframework.context.annotation.Bean
 import org.springframework.context.annotation.Configuration
@@ -36,6 +37,17 @@ class LocalPortStubs {
     @ConditionalOnMissingBean(GroupAccessProvider::class)
     fun stubGroupAccessProvider() = object : GroupAccessProvider {
         override fun existsGroup(groupId: Long) = true
+        override fun isMember(groupId: Long, userId: Long) = true
+        override fun isOwner(groupId: Long, userId: Long) = true
+    }
+
+    /**
+     * spending 도메인도 같은 이유로 자기 port를 따로 두고 있다.
+     * group 도메인이 생기면 어댑터 하나가 두 port를 함께 구현하게 된다.
+     */
+    @Bean
+    @ConditionalOnMissingBean(SpendingGroupAccessProvider::class)
+    fun stubSpendingGroupAccessProvider() = object : SpendingGroupAccessProvider {
         override fun isMember(groupId: Long, userId: Long) = true
         override fun isOwner(groupId: Long, userId: Long) = true
     }
