@@ -14,6 +14,7 @@ import org.springframework.boot.data.jpa.test.autoconfigure.DataJpaTest
 import java.time.LocalDateTime
 
 @DataJpaTest
+@org.springframework.test.context.ActiveProfiles("test")
 @AutoConfigureTestDatabase(replace = AutoConfigureTestDatabase.Replace.NONE)
 class ReportRepositoryTest @Autowired constructor(
     private val reportRepository: ReportRepository,

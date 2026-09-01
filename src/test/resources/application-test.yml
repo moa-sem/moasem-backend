@@ -1,0 +1,28 @@
+# 테스트 전용 데이터소스.
+#
+# 외부에 의존하지 않고 어디서나 도는 것이 목적이라 H2를 쓴다. 운영은 PostgreSQL이므로
+# MODE=PostgreSQL로 문법·타입 차이를 최대한 줄인다.
+#
+# JSONB처럼 H2가 흉내낼 수 없는 기능을 검증하는 테스트는 이 설정으로 돌릴 수 없다.
+# 그런 테스트는 실 PostgreSQL을 요구한다(예: ReportRepositoryTest).
+spring:
+  datasource:
+    # DEFAULT_LOCK_TIMEOUT: 비관적 락 테스트에서 뒤 트랜잭션이 앞 트랜잭션을 충분히 기다리도록 늘린다.
+    url: jdbc:h2:mem:moasem-test;MODE=PostgreSQL;DB_CLOSE_DELAY=-1;DEFAULT_LOCK_TIMEOUT=10000
+    driver-class-name: org.h2.Driver
+    username: sa
+    password: ""
+  jpa:
+    hibernate:
+      ddl-auto: create-drop
+    properties:
+      hibernate:
+        dialect: org.hibernate.dialect.H2Dialect
+  data:
+    redis:
+      host: localhost
+      port: 6379
+
+logging:
+  level:
+    com.moasem: info
