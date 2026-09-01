@@ -10,6 +10,7 @@ import com.moasem.backend.domain.report.entity.AiAnalysisStatus
 import com.moasem.backend.domain.report.entity.ReportStatus
 import com.moasem.backend.domain.report.service.ReportDownloadService
 import com.moasem.backend.domain.report.service.ReportQueryService
+import com.moasem.backend.domain.report.service.ReportRetryService
 import com.moasem.backend.global.error.BusinessException
 import com.moasem.backend.global.error.ErrorCode
 import com.moasem.backend.global.error.GlobalExceptionHandler
@@ -23,6 +24,7 @@ import org.springframework.boot.webmvc.test.autoconfigure.WebMvcTest
 import org.springframework.context.annotation.Import
 import org.springframework.test.web.servlet.MockMvc
 import org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get
+import org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post
 import org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath
 import org.springframework.test.web.servlet.result.MockMvcResultMatchers.status
 import java.time.LocalDateTime
@@ -40,6 +42,9 @@ class ReportControllerTest {
 
     @MockkBean
     private lateinit var reportDownloadService: ReportDownloadService
+
+    @MockkBean
+    private lateinit var reportRetryService: ReportRetryService
 
     @Test
     @DisplayName("보고서를 조회하면 공통 응답으로 감싸서 반환한다")
@@ -174,6 +179,46 @@ class ReportControllerTest {
             spendings = emptyList(),
             generatedAt = now.plusDays(3),
         )
+    }
+
+    @Test
+    @DisplayName("재생성을 요청하면 갱신된 상태를 반환한다")
+    fun retryReport() {
+        every { reportRetryService.retry(EVENT_ID, USER_ID) } returns ReportStatusResponse(
+            eventId = EVENT_ID,
+            status = ReportStatus.COMPLETED,
+            aiStatus = AiAnalysisStatus.SUCCEEDED,
+            downloadable = true,
+            retryable = false,
+            failureReason = null,
+            generatedAt = LocalDateTime.of(2026, 8, 27, 10, 0),
+        )
+
+        mockMvc.perform(post("/api/v1/events/$EVENT_ID/report/retry").header("X-User-Id", USER_ID))
+            .andExpect(status().isOk)
+            .andExpect(jsonPath("$.success").value(true))
+            .andExpect(jsonPath("$.data.status").value("COMPLETED"))
+            .andExpect(jsonPath("$.data.downloadable").value(true))
+    }
+
+    @Test
+    @DisplayName("재시도할 수 없는 상태면 409를 반환한다")
+    fun retryReportNotRetryable() {
+        every { reportRetryService.retry(EVENT_ID, USER_ID) } throws
+            BusinessException(ErrorCode.REPORT_NOT_RETRYABLE)
+
+        mockMvc.perform(post("/api/v1/events/$EVENT_ID/report/retry").header("X-User-Id", USER_ID))
+            .andExpect(status().isConflict)
+            .andExpect(jsonPath("$.success").value(false))
+            .andExpect(jsonPath("$.code").value("REPORT_NOT_RETRYABLE"))
+    }
+
+    @Test
+    @DisplayName("재생성에 X-User-Id가 없으면 400을 반환한다")
+    fun retryReportWithoutUserHeader() {
+        mockMvc.perform(post("/api/v1/events/$EVENT_ID/report/retry"))
+            .andExpect(status().isBadRequest)
+            .andExpect(jsonPath("$.success").value(false))
     }
 
     companion object {

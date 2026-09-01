@@ -123,4 +123,33 @@ interface ReportControllerDocs {
         @Parameter(description = "현재 로그인 사용자 ID. auth 완성 전까지 임시로 헤더로 받는다", example = "42")
         currentUserId: Long,
     ): ApiResponse<ReportDownloadResponse>
+
+    @Operation(
+        summary = "보고서 재생성",
+        description = """
+            생성에 실패한 보고서를 다시 만든다. 상태 조회에서 retryable이 true일 때만 호출한다.
+
+            확정된 결산 수치는 다시 계산하지 않고 그대로 재사용한다. 재계산하면 그사이 원본
+            지출이 바뀌었을 때 금액이 달라져, 같은 보고서인데 값이 다른 상황이 생긴다.
+            따라서 재시도해도 결산 금액은 처음과 동일하다. 다시 만드는 건 PDF·CSV 파일과
+            AI 분석뿐이다.
+
+            응답은 상태 조회와 같은 형태다. 재생성이 또 실패하면 status는 다시 FAILED가 되고
+            retryable도 true로 유지되므로 다시 시도할 수 있다.
+        """,
+    )
+    @ApiResponses(
+        SwaggerResponse(responseCode = "200", description = "재생성 완료. 성공 여부는 응답의 status로 판단한다"),
+        SwaggerResponse(responseCode = "403", description = "모임 구성원이 아님 (NOT_GROUP_MEMBER)"),
+        SwaggerResponse(responseCode = "404", description = "보고서 없음 (REPORT_NOT_FOUND)"),
+        SwaggerResponse(
+            responseCode = "409",
+            description = "재시도할 수 없는 상태 (REPORT_NOT_RETRYABLE). 실패한 보고서만 재시도할 수 있다",
+        ),
+    )
+    fun retryReport(
+        @Parameter(description = "행사 ID", example = "1") eventId: Long,
+        @Parameter(description = "현재 로그인 사용자 ID. auth 완성 전까지 임시로 헤더로 받는다", example = "42")
+        currentUserId: Long,
+    ): ApiResponse<ReportStatusResponse>
 }

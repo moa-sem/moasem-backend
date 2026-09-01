@@ -2,8 +2,6 @@ package com.moasem.backend.domain.report.service
 
 import com.moasem.backend.domain.report.dto.ReportDownloadResponse
 import com.moasem.backend.domain.report.entity.Report
-import com.moasem.backend.domain.report.repository.ReportRepository
-import com.moasem.backend.domain.report.service.port.GroupMembershipProvider
 import com.moasem.backend.domain.report.service.port.ReportFileStorage
 import com.moasem.backend.global.error.BusinessException
 import com.moasem.backend.global.error.ErrorCode
@@ -21,8 +19,7 @@ import java.time.LocalDateTime
 @Service
 @Transactional(readOnly = true)
 class ReportDownloadService(
-    private val reportRepository: ReportRepository,
-    private val groupMembershipProvider: GroupMembershipProvider,
+    private val accessGuard: ReportAccessGuard,
     private val fileStorage: ReportFileStorage,
 ) {
 
@@ -43,15 +40,7 @@ class ReportDownloadService(
      * 파일 자체가 없거나 불완전하다.
      */
     private fun findDownloadableReport(eventId: Long, currentUserId: Long): Report {
-        val report = reportRepository.findByEventId(eventId)
-            ?: throw BusinessException(ErrorCode.REPORT_NOT_FOUND)
-
-        val groupId = report.snapshot?.event?.groupId
-            ?: throw BusinessException(ErrorCode.REPORT_GENERATING)
-
-        if (!groupMembershipProvider.isMember(groupId, currentUserId)) {
-            throw BusinessException(ErrorCode.NOT_GROUP_MEMBER)
-        }
+        val report = accessGuard.findAccessibleReport(eventId, currentUserId)
 
         if (!report.isDownloadable) {
             throw BusinessException(ErrorCode.REPORT_NOT_DOWNLOADABLE)

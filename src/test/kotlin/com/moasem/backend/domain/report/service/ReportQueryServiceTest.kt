@@ -23,7 +23,10 @@ class ReportQueryServiceTest {
 
     private val reportRepository = mockk<ReportRepository>()
     private val membershipProvider = mockk<GroupMembershipProvider>()
-    private val service = ReportQueryService(reportRepository, membershipProvider, ReportConverter())
+
+    // 권한 검증까지 함께 확인하도록 guard는 실제 구현을 쓴다.
+    private val accessGuard = ReportAccessGuard(reportRepository, membershipProvider)
+    private val service = ReportQueryService(accessGuard, ReportConverter())
 
     @BeforeEach
     fun setUp() {

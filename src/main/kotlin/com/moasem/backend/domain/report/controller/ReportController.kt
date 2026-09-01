@@ -5,9 +5,11 @@ import com.moasem.backend.domain.report.dto.ReportDownloadResponse
 import com.moasem.backend.domain.report.dto.ReportStatusResponse
 import com.moasem.backend.domain.report.service.ReportDownloadService
 import com.moasem.backend.domain.report.service.ReportQueryService
+import com.moasem.backend.domain.report.service.ReportRetryService
 import com.moasem.backend.global.response.ApiResponse
 import org.springframework.web.bind.annotation.GetMapping
 import org.springframework.web.bind.annotation.PathVariable
+import org.springframework.web.bind.annotation.PostMapping
 import org.springframework.web.bind.annotation.RequestHeader
 import org.springframework.web.bind.annotation.RequestMapping
 import org.springframework.web.bind.annotation.RestController
@@ -26,6 +28,7 @@ import org.springframework.web.bind.annotation.RestController
 class ReportController(
     private val reportQueryService: ReportQueryService,
     private val reportDownloadService: ReportDownloadService,
+    private val reportRetryService: ReportRetryService,
 ) : ReportControllerDocs {
 
     @GetMapping
@@ -55,6 +58,13 @@ class ReportController(
         @RequestHeader(USER_ID_HEADER) currentUserId: Long,
     ): ApiResponse<ReportDownloadResponse> =
         ApiResponse.success(reportDownloadService.getCsvDownload(eventId, currentUserId))
+
+    @PostMapping("/retry")
+    override fun retryReport(
+        @PathVariable eventId: Long,
+        @RequestHeader(USER_ID_HEADER) currentUserId: Long,
+    ): ApiResponse<ReportStatusResponse> =
+        ApiResponse.success(reportRetryService.retry(eventId, currentUserId))
 
     companion object {
         const val USER_ID_HEADER = "X-User-Id"
