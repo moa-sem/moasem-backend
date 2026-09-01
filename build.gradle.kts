@@ -53,7 +53,8 @@ dependencies {
 	implementation("com.itextpdf:itext7-core:8.0.5")
 	implementation("org.apache.commons:commons-csv:1.11.0")
 
-	// API 문서 (Swagger)
+	// 운영 (헬스 체크 — 배포 시 컨테이너 상태 판정에 사용)
+	implementation("org.springframework.boot:spring-boot-starter-actuator")
 	implementation("org.springdoc:springdoc-openapi-starter-webmvc-ui:3.1.0")
 
 	// 개발 편의
