@@ -1,6 +1,7 @@
 package com.moasem.backend.domain.spending.converter
 
 import com.moasem.backend.domain.spending.dto.SpendingDetailResponse
+import com.moasem.backend.domain.spending.dto.SpendingListResponse
 import com.moasem.backend.domain.spending.entity.Spending
 
 object SpendingConverter {
@@ -26,6 +27,18 @@ object SpendingConverter {
         processedByUserId = spending.processedByUserId,
         rejectionReason = spending.rejectionReason,
         processedAt = spending.processedAt,
+        createdAt = spending.createdAt,
+    )
+
+    fun toListResponse(spending: Spending): SpendingListResponse = SpendingListResponse(
+        spendingId = spending.id ?: error("저장되지 않은 지출은 응답으로 변환할 수 없습니다."),
+        applicantUserId = spending.applicantUserId,
+        amount = spending.amount,
+        spentOn = spending.spentOn,
+        reason = spending.reason,
+        tag = spending.tag,
+        tagLabel = spending.tag.label,
+        status = spending.status,
         createdAt = spending.createdAt,
     )
 }
