@@ -1,5 +1,6 @@
 package com.moasem.backend.domain.spending.entity
 
+import com.moasem.backend.global.storage.FileUploadPolicy
 import jakarta.persistence.Column
 import jakarta.persistence.Entity
 import jakarta.persistence.EnumType
@@ -176,20 +177,11 @@ class Spending protected constructor(
     ) {
         init {
             require(storageKey.isNotBlank()) { "증빙 저장 키는 비어 있을 수 없습니다." }
-            require(mimeType in ALLOWED_MIME_TYPES) {
-                "증빙 이미지는 JPEG 또는 PNG만 허용합니다. mimeType=$mimeType"
-            }
-            require(fileSize == null || fileSize in 1..MAX_FILE_SIZE_BYTES) {
-                "증빙 파일 크기는 1바이트 이상 ${MAX_FILE_SIZE_BYTES}바이트 이하여야 합니다. fileSize=$fileSize"
-            }
+            FileUploadPolicy.EVIDENCE_IMAGE.validate(mimeType, fileSize)
         }
     }
 
     companion object {
-        val ALLOWED_MIME_TYPES = setOf("image/jpeg", "image/png")
-
-        /** 증빙 이미지 한 장 기준 상한. 휴대폰 사진 원본이 들어와도 통과하는 크기다. */
-        const val MAX_FILE_SIZE_BYTES = 10L * 1024 * 1024
 
         fun create(
             eventId: Long,
