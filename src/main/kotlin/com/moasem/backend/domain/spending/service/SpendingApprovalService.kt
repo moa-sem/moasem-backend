@@ -7,6 +7,8 @@ import com.moasem.backend.domain.spending.entity.Spending
 import com.moasem.backend.domain.spending.repository.SpendingRepository
 import com.moasem.backend.domain.spending.service.port.EventAccessProvider
 import com.moasem.backend.domain.spending.service.port.GroupAccessProvider
+import com.moasem.backend.global.error.BusinessException
+import com.moasem.backend.global.error.ErrorCode
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
 
@@ -60,8 +62,10 @@ class SpendingApprovalService(
         require(userId > 0) { "사용자 ID는 양수여야 합니다." }
 
         val access = eventAccessProvider.findAccess(eventId)
-            ?: throw NoSuchElementException("행사를 찾을 수 없습니다. eventId=$eventId")
-        check(groupAccessProvider.isOwner(access.groupId, userId)) { "모임장만 지출을 처리할 수 있습니다." }
+            ?: throw BusinessException(ErrorCode.EVENT_NOT_FOUND)
+        if (!groupAccessProvider.isOwner(access.groupId, userId)) {
+            throw BusinessException(ErrorCode.NOT_GROUP_OWNER, "모임장만 지출을 처리할 수 있습니다.")
+        }
     }
 
     /**
@@ -72,5 +76,5 @@ class SpendingApprovalService(
      */
     private fun findForProcessing(eventId: Long, spendingId: Long): Spending =
         spendingRepository.findWithLockByIdAndEventId(spendingId, eventId)
-            ?: throw NoSuchElementException("지출을 찾을 수 없습니다. spendingId=$spendingId")
+            ?: throw BusinessException(ErrorCode.SPENDING_NOT_FOUND)
 }

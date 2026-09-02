@@ -9,6 +9,8 @@ import com.moasem.backend.domain.spending.repository.SpendingRepository
 import com.moasem.backend.domain.spending.service.port.EventAccess
 import com.moasem.backend.domain.spending.service.port.EventAccessProvider
 import com.moasem.backend.domain.spending.service.port.GroupAccessProvider
+import com.moasem.backend.global.error.ErrorCode
+import com.moasem.backend.global.error.hasErrorCode
 import io.mockk.every
 import io.mockk.mockk
 import io.mockk.verify
@@ -64,8 +66,7 @@ class SpendingApprovalServiceTest {
         @Test
         fun `모임장이 아닌 구성원은 승인할 수 없다`() {
             assertThatThrownBy { approvalService.approve(EVENT_ID, SPENDING_ID, MEMBER_ID) }
-                .isInstanceOf(IllegalStateException::class.java)
-                .hasMessageContaining("모임장만")
+                .hasErrorCode(ErrorCode.NOT_GROUP_OWNER)
 
             verify(exactly = 0) { spendingRepository.findWithLockByIdAndEventId(any(), any()) }
         }
@@ -75,8 +76,7 @@ class SpendingApprovalServiceTest {
             every { spendingRepository.findWithLockByIdAndEventId(SPENDING_ID, EVENT_ID) } returns null
 
             assertThatThrownBy { approvalService.approve(EVENT_ID, SPENDING_ID, OWNER_ID) }
-                .isInstanceOf(NoSuchElementException::class.java)
-                .hasMessageContaining("지출을 찾을 수 없습니다")
+                .hasErrorCode(ErrorCode.SPENDING_NOT_FOUND)
         }
 
         @Test
@@ -84,8 +84,7 @@ class SpendingApprovalServiceTest {
             every { eventAccessProvider.findAccess(EVENT_ID) } returns null
 
             assertThatThrownBy { approvalService.approve(EVENT_ID, SPENDING_ID, OWNER_ID) }
-                .isInstanceOf(NoSuchElementException::class.java)
-                .hasMessageContaining("행사를 찾을 수 없습니다")
+                .hasErrorCode(ErrorCode.EVENT_NOT_FOUND)
         }
     }
 
@@ -119,8 +118,7 @@ class SpendingApprovalServiceTest {
         @Test
         fun `모임장이 아닌 구성원은 반려할 수 없다`() {
             assertThatThrownBy { approvalService.reject(EVENT_ID, SPENDING_ID, MEMBER_ID, rejectRequest()) }
-                .isInstanceOf(IllegalStateException::class.java)
-                .hasMessageContaining("모임장만")
+                .hasErrorCode(ErrorCode.NOT_GROUP_OWNER)
         }
     }
 
@@ -143,8 +141,7 @@ class SpendingApprovalServiceTest {
             approvalService.approve(EVENT_ID, SPENDING_ID, OWNER_ID)
 
             assertThatThrownBy { approvalService.approve(EVENT_ID, SPENDING_ID, OWNER_ID) }
-                .isInstanceOf(IllegalStateException::class.java)
-                .hasMessageContaining("PENDING")
+                .hasErrorCode(ErrorCode.SPENDING_ALREADY_HANDLED)
         }
 
         @Test
@@ -153,8 +150,7 @@ class SpendingApprovalServiceTest {
             approvalService.approve(EVENT_ID, SPENDING_ID, OWNER_ID)
 
             assertThatThrownBy { approvalService.reject(EVENT_ID, SPENDING_ID, OWNER_ID, rejectRequest()) }
-                .isInstanceOf(IllegalStateException::class.java)
-                .hasMessageContaining("PENDING")
+                .hasErrorCode(ErrorCode.SPENDING_ALREADY_HANDLED)
 
             assertThat(spending.status).isEqualTo(SpendingStatus.APPROVED)
             assertThat(spending.rejectionReason).isNull()
@@ -166,8 +162,7 @@ class SpendingApprovalServiceTest {
             approvalService.reject(EVENT_ID, SPENDING_ID, OWNER_ID, rejectRequest())
 
             assertThatThrownBy { approvalService.approve(EVENT_ID, SPENDING_ID, OWNER_ID) }
-                .isInstanceOf(IllegalStateException::class.java)
-                .hasMessageContaining("PENDING")
+                .hasErrorCode(ErrorCode.SPENDING_ALREADY_HANDLED)
 
             assertThat(spending.status).isEqualTo(SpendingStatus.REJECTED)
         }
