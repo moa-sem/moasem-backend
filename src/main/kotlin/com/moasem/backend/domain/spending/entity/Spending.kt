@@ -1,5 +1,7 @@
 package com.moasem.backend.domain.spending.entity
 
+import com.moasem.backend.global.error.BusinessException
+import com.moasem.backend.global.error.ErrorCode
 import com.moasem.backend.global.storage.FileUploadPolicy
 import jakarta.persistence.Column
 import jakarta.persistence.Entity
@@ -164,8 +166,19 @@ class Spending protected constructor(
         processedAt = LocalDateTime.now()
     }
 
+    /**
+     * 아직 처리되지 않은 건인지 확인한다.
+     *
+     * 상태 전이 규칙이라 [BusinessException]으로 던진다. 승인·반려·수정이 모두 이 한 곳을
+     * 거치므로, 동시에 들어온 두 요청 중 뒤엣것이 여기서 걸린다.
+     */
     private fun checkPending(action: String) {
-        check(isPending) { "PENDING 상태의 지출만 ${action}할 수 있습니다. 현재 상태: $status" }
+        if (!isPending) {
+            throw BusinessException(
+                ErrorCode.SPENDING_ALREADY_HANDLED,
+                "PENDING 상태의 지출만 ${action}할 수 있습니다. 현재 상태: $status",
+            )
+        }
     }
 
     /** 증빙 파일 정보 묶음. 항상 네 값이 함께 바뀌므로 한 덩어리로 넘긴다. */

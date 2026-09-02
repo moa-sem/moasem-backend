@@ -1,5 +1,7 @@
 package com.moasem.backend.global.storage
 
+import com.moasem.backend.global.error.ErrorCode
+import com.moasem.backend.global.error.hasErrorCode
 import org.assertj.core.api.Assertions.assertThatCode
 import org.assertj.core.api.Assertions.assertThatThrownBy
 import org.junit.jupiter.api.Test
@@ -20,8 +22,7 @@ class FileUploadPolicyTest {
     @ValueSource(strings = ["application/pdf", "image/gif", "image/jpg", "IMAGE/JPEG", "text/plain"])
     fun `그 외 형식은 거부한다`(mimeType: String) {
         assertThatThrownBy { policy.validate(mimeType, 1_024L) }
-            .isInstanceOf(IllegalArgumentException::class.java)
-            .hasMessageContaining("허용하지 않는 파일 형식")
+            .hasErrorCode(ErrorCode.UNSUPPORTED_FILE_TYPE)
     }
 
     @Test
@@ -29,15 +30,13 @@ class FileUploadPolicyTest {
         assertThatCode { policy.validate("image/jpeg", policy.maxSizeBytes) }.doesNotThrowAnyException()
 
         assertThatThrownBy { policy.validate("image/jpeg", policy.maxSizeBytes + 1) }
-            .isInstanceOf(IllegalArgumentException::class.java)
-            .hasMessageContaining("파일 크기")
+            .hasErrorCode(ErrorCode.FILE_SIZE_EXCEEDED)
     }
 
     @Test
     fun `빈 파일은 거부한다`() {
         assertThatThrownBy { policy.validate("image/jpeg", 0L) }
-            .isInstanceOf(IllegalArgumentException::class.java)
-            .hasMessageContaining("파일 크기")
+            .hasErrorCode(ErrorCode.FILE_SIZE_EXCEEDED)
     }
 
     @Test

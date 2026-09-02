@@ -14,6 +14,8 @@ import com.moasem.backend.domain.spending.repository.SpendingRepository
 import com.moasem.backend.domain.spending.service.port.EventAccess
 import com.moasem.backend.domain.spending.service.port.EventAccessProvider
 import com.moasem.backend.domain.spending.service.port.GroupAccessProvider
+import com.moasem.backend.global.error.BusinessException
+import com.moasem.backend.global.error.ErrorCode
 import com.moasem.backend.global.storage.FileUploadPolicy
 import com.moasem.backend.global.storage.PrivateFileStorage
 import org.springframework.data.domain.Page
@@ -109,7 +111,7 @@ class SpendingService(
         findAccessibleEvent(eventId, currentUserId)
 
         val spending = findSpendingOf(eventId, spendingId)
-        check(spending.isApplicant(currentUserId)) { "본인이 신청한 지출만 수정할 수 있습니다." }
+        if (!spending.isApplicant(currentUserId)) throw BusinessException(ErrorCode.NOT_SPENDING_APPLICANT)
 
         val evidence = requireNotNull(request.evidence) { "증빙 정보는 필수입니다." }
         validateEvidenceKeyOwnership(evidence.storageKey, eventId, currentUserId)
@@ -186,7 +188,9 @@ class SpendingService(
      */
     private fun validateApplicable(eventId: Long, userId: Long) {
         val access = findAccessibleEvent(eventId, userId)
-        check(access.isActive) { "마감된 행사에는 지출을 신청할 수 없습니다." }
+        if (!access.isActive) {
+            throw BusinessException(ErrorCode.EVENT_ALREADY_CLOSED, "마감된 행사에는 지출을 신청할 수 없습니다.")
+        }
     }
 
     /** 요청자가 들여다봐도 되는 행사인지 확인하고 행사 정보를 돌려준다. */
@@ -195,15 +199,17 @@ class SpendingService(
         require(userId > 0) { "사용자 ID는 양수여야 합니다." }
 
         val access = eventAccessProvider.findAccess(eventId)
-            ?: throw NoSuchElementException("행사를 찾을 수 없습니다. eventId=$eventId")
-        check(groupAccessProvider.isMember(access.groupId, userId)) { "모임 구성원만 접근할 수 있습니다." }
+            ?: throw BusinessException(ErrorCode.EVENT_NOT_FOUND)
+        if (!groupAccessProvider.isMember(access.groupId, userId)) {
+            throw BusinessException(ErrorCode.NOT_GROUP_MEMBER)
+        }
         return access
     }
 
     /** 경로의 행사에 실제로 속한 지출인지까지 확인해서 가져온다. */
     private fun findSpendingOf(eventId: Long, spendingId: Long): Spending =
         spendingRepository.findByIdAndEventId(spendingId, eventId)
-            ?: throw NoSuchElementException("지출을 찾을 수 없습니다. spendingId=$spendingId")
+            ?: throw BusinessException(ErrorCode.SPENDING_NOT_FOUND)
 
     /**
      * 신청에 실린 저장 키가 본인이 이 행사에서 발급받은 것인지 확인한다.
@@ -211,8 +217,11 @@ class SpendingService(
      * 저장 키는 클라이언트가 보내는 값이므로 그대로 믿으면 남의 증빙을 자기 신청에 붙일 수 있다.
      */
     private fun validateEvidenceKeyOwnership(storageKey: String, eventId: Long, userId: Long) {
-        require(storageKey.startsWith(evidenceKeyPrefix(eventId, userId))) {
-            "본인이 이 행사에서 발급받은 증빙 저장 키만 사용할 수 있습니다."
+        if (!storageKey.startsWith(evidenceKeyPrefix(eventId, userId))) {
+            throw BusinessException(
+                ErrorCode.INVALID_EVIDENCE_KEY,
+                "본인이 이 행사에서 발급받은 증빙 저장 키만 사용할 수 있습니다.",
+            )
         }
     }
 

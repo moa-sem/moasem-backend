@@ -21,6 +21,10 @@ enum class ErrorCode(val status: HttpStatus, val message: String) {
     ENTITY_NOT_FOUND(HttpStatus.NOT_FOUND, "요청한 리소스를 찾을 수 없습니다."),
     INTERNAL_SERVER_ERROR(HttpStatus.INTERNAL_SERVER_ERROR, "서버 내부 오류가 발생했습니다."),
 
+    // 파일 업로드
+    UNSUPPORTED_FILE_TYPE(HttpStatus.BAD_REQUEST, "허용하지 않는 파일 형식입니다."),
+    FILE_SIZE_EXCEEDED(HttpStatus.BAD_REQUEST, "허용 용량을 넘는 파일입니다."),
+
     // 인증·인가
     UNAUTHORIZED(HttpStatus.UNAUTHORIZED, "인증이 필요합니다."),
     ACCESS_DENIED(HttpStatus.FORBIDDEN, "접근 권한이 없습니다."),
@@ -38,6 +42,8 @@ enum class ErrorCode(val status: HttpStatus, val message: String) {
     // 지출
     SPENDING_NOT_FOUND(HttpStatus.NOT_FOUND, "지출 내역을 찾을 수 없습니다."),
     SPENDING_ALREADY_HANDLED(HttpStatus.CONFLICT, "이미 처리된 지출입니다."),
+    NOT_SPENDING_APPLICANT(HttpStatus.FORBIDDEN, "본인이 신청한 지출만 수정할 수 있습니다."),
+    INVALID_EVIDENCE_KEY(HttpStatus.FORBIDDEN, "본인이 발급받은 증빙 저장 키가 아닙니다."),
 
     // 보고서
     REPORT_NOT_FOUND(HttpStatus.NOT_FOUND, "보고서를 찾을 수 없습니다."),
