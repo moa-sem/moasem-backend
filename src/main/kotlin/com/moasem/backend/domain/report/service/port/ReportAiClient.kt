@@ -10,7 +10,7 @@ package com.moasem.backend.domain.report.service.port
 interface ReportAiClient {
 
     /**
-     * @return 분석 코멘트 텍스트. 금액을 포함하지 않는다.
+     * @return 분석 코멘트 텍스트
      * @throws ReportAiException 분석에 실패한 경우
      */
     fun analyze(input: AiAnalysisInput): String
@@ -24,6 +24,8 @@ interface ReportAiClient {
  */
 data class AiAnalysisInput(
     val eventTitle: String,
+    /** 참여 인원. 마감 시 입력되지 않았으면 null이고, 이때는 프롬프트에서 빠진다. */
+    val participantCount: Int?,
     val totalBudget: Long,
     val totalSpent: Long,
     val remainingBalance: Long,

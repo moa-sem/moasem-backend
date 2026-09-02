@@ -130,6 +130,7 @@ class ReportGenerationService(
     /** AI에는 집계값만 넘긴다. 개별 지출을 주지 않아 금액을 재계산할 여지를 없앤다. */
     private fun toAiInput(snapshot: ReportSnapshot) = AiAnalysisInput(
         eventTitle = snapshot.event.title,
+        participantCount = snapshot.event.participantCount,
         totalBudget = snapshot.budget.totalBudget,
         totalSpent = snapshot.budget.totalSpent,
         remainingBalance = snapshot.budget.remainingBalance,
