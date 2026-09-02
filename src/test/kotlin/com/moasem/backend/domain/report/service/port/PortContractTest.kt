@@ -122,6 +122,7 @@ class PortContractTest {
 
         private fun sampleInput() = AiAnalysisInput(
             eventTitle = "여름 MT",
+            participantCount = 8,
             totalBudget = 500_000L,
             totalSpent = 320_000L,
             remainingBalance = 180_000L,
