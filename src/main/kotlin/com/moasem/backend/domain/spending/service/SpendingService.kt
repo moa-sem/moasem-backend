@@ -1,6 +1,5 @@
 package com.moasem.backend.domain.spending.service
 
-import com.moasem.backend.domain.spending.converter.SpendingConverter
 import com.moasem.backend.domain.spending.dto.CreateSpendingRequest
 import com.moasem.backend.domain.spending.dto.EvidenceUploadUrlRequest
 import com.moasem.backend.domain.spending.dto.EvidenceUploadUrlResponse
@@ -92,7 +91,7 @@ class SpendingService(
             ),
         )
 
-        return SpendingConverter.toDetailResponse(spendingRepository.save(spending))
+        return SpendingDetailResponse.from(spendingRepository.save(spending))
     }
 
     /**
@@ -130,7 +129,7 @@ class SpendingService(
             ),
         )
 
-        return SpendingConverter.toDetailResponse(spending)
+        return SpendingDetailResponse.from(spending)
     }
 
     /** 행사의 지출 목록을 조회한다. [status]가 없으면 상태를 가리지 않는다. */
@@ -148,13 +147,13 @@ class SpendingService(
         } else {
             spendingRepository.findAllByEventIdAndStatus(eventId, status, pageable)
         }
-        return spendings.map(SpendingConverter::toListResponse)
+        return spendings.map(SpendingListResponse::from)
     }
 
     @Transactional(readOnly = true)
     fun getSpending(eventId: Long, spendingId: Long, currentUserId: Long): SpendingDetailResponse {
         findAccessibleEvent(eventId, currentUserId)
-        return SpendingConverter.toDetailResponse(findSpendingOf(eventId, spendingId))
+        return SpendingDetailResponse.from(findSpendingOf(eventId, spendingId))
     }
 
     /**
