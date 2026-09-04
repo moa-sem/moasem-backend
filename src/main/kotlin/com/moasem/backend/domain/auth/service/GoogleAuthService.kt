@@ -5,7 +5,6 @@ import com.moasem.backend.domain.auth.dto.request.RefreshTokenRequest
 import com.moasem.backend.domain.auth.dto.response.TokenResponse
 import com.moasem.backend.domain.auth.entity.Member
 import com.moasem.backend.domain.auth.repository.MemberRepository
-import com.moasem.backend.global.security.JwtProperties
 import com.moasem.backend.global.security.JwtProvider
 import org.springframework.beans.factory.annotation.Value
 import org.springframework.data.redis.core.StringRedisTemplate
@@ -17,10 +16,11 @@ import java.time.Duration
 class GoogleAuthService (
     private val memberRepository: MemberRepository,
     private val jwtProvider: JwtProvider,
-    private val jwtProperties: JwtProperties,
     private val redisTemplate: StringRedisTemplate,
     @Value("\${moasem.oauth2.google.client-id}")
     private val googleClientId: String,
+    @Value("\${moasem.jwt.refresh-token-expiration-ms}")
+    private val refreshTokenExpirationMs: Long,
 ) {
     val restClient = RestClient.create()
 
@@ -42,7 +42,7 @@ class GoogleAuthService (
         redisTemplate.opsForValue().set(
             "refresh:${member.id}",
             refreshToken,
-            Duration.ofMillis(jwtProperties.refreshTokenExpirationMs)
+            Duration.ofMillis(refreshTokenExpirationMs)
         )
 
         return TokenResponse (accessToken, refreshToken)

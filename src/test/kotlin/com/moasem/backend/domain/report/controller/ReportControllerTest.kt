@@ -23,6 +23,7 @@ import org.springframework.beans.factory.annotation.Autowired
 import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc
 import org.springframework.boot.webmvc.test.autoconfigure.WebMvcTest
 import org.springframework.context.annotation.Import
+import org.springframework.test.context.ActiveProfiles
 import org.springframework.test.web.servlet.MockMvc
 import org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get
 import org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post
@@ -33,6 +34,7 @@ import java.time.LocalDateTime
 @WebMvcTest(controllers = [ReportController::class])
 @Import(GlobalExceptionHandler::class)
 @AutoConfigureMockMvc(addFilters = false)
+@ActiveProfiles("test")
 class ReportControllerTest {
 
     @Autowired
