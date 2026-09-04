@@ -7,6 +7,8 @@ import com.moasem.backend.domain.event.repository.EventRepository
 import com.moasem.backend.domain.event.service.port.ApprovedSpendingTotalProvider
 import com.moasem.backend.domain.event.service.port.GroupAccessProvider
 import com.moasem.backend.domain.event.service.port.PendingSpendingCountProvider
+import com.moasem.backend.global.error.BusinessException
+import com.moasem.backend.global.error.ErrorCode
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
 
@@ -28,14 +30,16 @@ class EventClosePreviewService(
     ): EventClosePreviewResponse {
         validateGroupOwner(groupId, currentUserId)
         val event = eventRepository.findByIdAndGroupIdAndDeletedAtIsNull(eventId, groupId)
-            ?: throw NoSuchElementException("행사를 찾을 수 없습니다. eventId=$eventId")
+            ?: throw BusinessException(ErrorCode.EVENT_NOT_FOUND)
 
-        check(event.status == EventStatus.ACTIVE) { "진행 중인 행사만 마감할 수 있습니다." }
-        require(participantCount >= 1) { "행사 참여 인원은 1명 이상이어야 합니다." }
+        if (event.status != EventStatus.ACTIVE) throw BusinessException(ErrorCode.EVENT_ALREADY_CLOSED)
+        if (participantCount < 1) {
+            throw BusinessException(ErrorCode.INVALID_INPUT_VALUE, "행사 참여 인원은 1명 이상이어야 합니다.")
+        }
 
         val persistedEventId = event.id ?: error("저장되지 않은 행사는 마감할 수 없습니다.")
         val pendingSpendingCount = pendingSpendingCountProvider.getPendingSpendingCount(persistedEventId)
-        check(pendingSpendingCount == 0L) { "대기 중인 지출 신청이 있는 행사는 마감할 수 없습니다." }
+        if (pendingSpendingCount != 0L) throw BusinessException(ErrorCode.EVENT_HAS_PENDING_SPENDING)
 
         val additionalBudget = budgetAdditionRepository.sumAmountByEventId(persistedEventId)
         val approvedSpending = approvedSpendingTotalProvider.getApprovedSpendingTotal(persistedEventId)
@@ -56,10 +60,12 @@ class EventClosePreviewService(
     }
 
     private fun validateGroupOwner(groupId: Long, userId: Long) {
-        require(groupId > 0) { "모임 ID는 양수여야 합니다." }
-        require(userId > 0) { "사용자 ID는 양수여야 합니다." }
-        check(groupAccessProvider.existsGroup(groupId)) { "모임을 찾을 수 없습니다. groupId=$groupId" }
-        check(groupAccessProvider.isMember(groupId, userId)) { "모임 구성원만 접근할 수 있습니다." }
-        check(groupAccessProvider.isOwner(groupId, userId)) { "모임장만 행사 마감을 미리 확인할 수 있습니다." }
+        if (groupId <= 0) throw BusinessException(ErrorCode.INVALID_INPUT_VALUE, "모임 ID는 양수여야 합니다.")
+        if (userId <= 0) throw BusinessException(ErrorCode.INVALID_INPUT_VALUE, "사용자 ID는 양수여야 합니다.")
+        if (!groupAccessProvider.existsGroup(groupId)) throw BusinessException(ErrorCode.GROUP_NOT_FOUND)
+        if (!groupAccessProvider.isMember(groupId, userId)) throw BusinessException(ErrorCode.NOT_GROUP_MEMBER)
+        if (!groupAccessProvider.isOwner(groupId, userId)) {
+            throw BusinessException(ErrorCode.NOT_GROUP_OWNER, "모임장만 행사 마감을 미리 확인할 수 있습니다.")
+        }
     }
 }
