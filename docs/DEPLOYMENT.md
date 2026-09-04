@@ -41,19 +41,61 @@ CD는 `~/moasem` 에 `docker-compose.prod.yml` 을 전송하고, 같은 위치�
 
 ```bash
 mkdir -p ~/moasem && cd ~/moasem
-cat > .env <<'ENV'
-POSTGRES_DB=moasem
-POSTGRES_USER=moasem
-POSTGRES_PASSWORD=<강력한_비밀번호>
-ENV
+nano .env      # 히스토리에 값이 남지 않도록 편집기로 작성한다
 chmod 600 .env
+```
+
+```
+DB_HOST=<RDS 엔드포인트>
+POSTGRES_DB=moasem
+POSTGRES_USER=<RDS 마스터 사용자>
+POSTGRES_PASSWORD=<RDS 마스터 암호>
+```
+
+| 변수 | 값 | 확인 위치 |
+|---|---|---|
+| `DB_HOST` | RDS 엔드포인트 | RDS 콘솔 → 연결 & 보안 |
+| `POSTGRES_DB` | DB 이름 | RDS 콘솔 → 구성 |
+| `POSTGRES_USER` | 마스터 사용자 이름 | RDS 콘솔 → 구성 |
+| `POSTGRES_PASSWORD` | 마스터 암호 | **조회 불가.** 모르면 RDS 수정에서 재설정한다 |
+
+DB 인스턴스 **식별자**(`moasem-db`)는 AWS가 인스턴스를 구분하는 이름일 뿐이라
+어느 변수에도 들어가지 않는다.
+
+`POSTGRES_` 라는 접두사는 컨테이너 DB를 쓰던 때 붙은 이름이 그대로 남은 것이다.
+지금은 컨테이너를 만드는 값이 아니라 RDS에 접속하는 값이다.
+
+값이 하나라도 비면 `docker compose` 가 컨테이너를 올리기 전에 어떤 변수가
+없는지 알려주고 멈춘다. 비어 있는 채로 기동해 원인 불명의 연결 실패가 나는 것보다 낫다.
+
+`.env` 확인은 값이 화면에 찍히지 않도록 이름만 본다.
+
+```bash
+cut -d= -f1 .env
+```
+
+값을 바꾼 뒤에는 앱 컨테이너만 다시 올리면 된다.
+
+```bash
+cd ~/moasem
+docker compose -f docker-compose.prod.yml up -d app
 ```
 
 ### 3.3 보안 그룹
 
+**EC2 보안 그룹**
+
 - 22 (SSH): 배포용. GitHub Actions는 고정 IP가 아니므로 열어둬야 한다.
 - 8080 (앱): 필요 범위만. 앞단에 Nginx/ALB를 둘 경우 8080은 닫고 그쪽만 연다.
-- 5432 / 6379: **열지 않는다.** `docker-compose.prod.yml` 에서 `expose` 만 써서 컨테이너 네트워크 안에만 노출된다.
+- 6379: **열지 않는다.** Redis는 `expose` 만 써서 컨테이너 네트워크 안에만 노출된다.
+
+**RDS 보안 그룹**
+
+인바운드에 5432를 열되, 소스를 **EC2의 보안 그룹**으로 지정한다.
+IP로 지정하면 EC2를 재시작해 IP가 바뀔 때 연결이 끊긴다.
+
+이 설정이 없으면 앱이 DB 연결 타임아웃으로 기동에 실패한다.
+RDS는 퍼블릭 액세스를 끈 상태로 둔다.
 
 ## 4. 배포 흐름
 
@@ -67,6 +109,30 @@ chmod 600 .env
 **`SecurityConfig` 를 작성할 때 `/actuator/health` 를 `permitAll` 로 열어두면** 헬스 체크가 200을 받게 되고,
 그때 compose 의 healthcheck 를 `curl -f` 로 조여도 된다.
 
+## 4.1 알려진 제약: 스키마가 자동으로 만들어지지 않는다
+
+운영 프로파일은 `ddl-auto: validate` 다. 엔티티와 테이블이 맞는지 확인만 하고,
+없는 테이블을 만들어 주지는 않는다.
+
+따라서 **비어 있는 RDS에 처음 배포하면 앱이 기동에 실패한다.**
+
+```
+새 RDS(테이블 0개) → 앱 기동 → validate 실패 → 헬스 체크 3분 대기 → 배포 실패
+```
+
+로컬(`ddl-auto: update`)에서는 Hibernate가 테이블을 만들어 주기 때문에 이 문제가 드러나지 않는다.
+운영에서 Hibernate가 스키마를 바꾸게 두면 위험하므로 `validate` 자체는 의도한 설정이고,
+**테이블을 누가 만들 것인가가 아직 정해지지 않았다.**
+
+선택지는 둘이다.
+
+- **Flyway 도입** — `src/main/resources/db/migration` 에 SQL을 두면 기동 시 적용된다.
+  스키마가 버전 관리되고 팀원 로컬에도 같은 스키마가 깔린다.
+- **수동 생성** — RDS에 직접 붙어 `CREATE TABLE` 을 실행한다. 지금은 빠르지만
+  엔티티가 바뀔 때마다 사람이 맞춰야 하고, 놓치면 `validate` 가 배포를 막는다.
+
+모든 도메인의 테이블이 걸려 있어 팀 논의가 필요하다. 정해지기 전까지 배포는 성공하지 않는다.
+
 ## 5. 수동 조작
 
 ```bash
@@ -79,17 +145,19 @@ cd ~/moasem && export APP_IMAGE=ghcr.io/moa-sem/moasem-backend:latest && docker 
 cd ~/moasem && export APP_IMAGE=ghcr.io/moa-sem/moasem-backend:sha-<커밋해시> && docker compose -f docker-compose.prod.yml up -d app
 ```
 
-## 6. RDS / ElastiCache 로 옮길 때
+## 6. ElastiCache 로 옮길 때
 
-`docker-compose.prod.yml` 에서 `db`, `redis` 서비스와 `depends_on`, `volumes` 를 지우고
+DB는 이미 RDS를 쓴다. Redis는 아직 EC2 안의 컨테이너다.
+
+옮기려면 `docker-compose.prod.yml` 에서 `redis` 서비스와 `depends_on`, `redis_data` 볼륨을 지우고
 `app` 의 환경 변수만 바꾼다.
 
 ```yaml
-DB_URL: jdbc:postgresql://<rds-엔드포인트>:5432/moasem
-REDIS_HOST: <elasticache-엔드포인트>
+REDIS_HOST: ${REDIS_HOST:?.env에 REDIS_HOST가 없습니다}
 ```
 
-`prod` 프로필은 이미 `DB_URL` / `REDIS_HOST` 를 환경 변수로 받으므로 애플리케이션 코드 변경은 없다.
+`prod` 프로필은 이미 `REDIS_HOST` 를 환경 변수로 받으므로 애플리케이션 코드 변경은 없다.
+DB와 마찬가지로 ElastiCache 보안 그룹에서 EC2 보안 그룹의 6379 인바운드를 허용해야 한다.
 
 ## 7. 로컬 개발
 

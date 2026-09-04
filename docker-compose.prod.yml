@@ -1,25 +1,9 @@
 # EC2 운영용. CD 워크플로가 이 파일을 EC2로 전송한 뒤 실행한다.
 # 비밀값은 같은 디렉터리의 .env 파일에서 읽는다 (docs/DEPLOYMENT.md 참고).
+#
+# DB는 RDS를 쓰므로 여기에 DB 컨테이너가 없다. 로컬 개발용 docker-compose.yml은
+# 그대로 컨테이너 DB를 띄운다.
 services:
-  db:
-    image: postgres:16-alpine
-    container_name: moasem-db
-    restart: unless-stopped
-    # 외부 노출 없이 컨테이너 네트워크 안에서만 접근
-    expose:
-      - "5432"
-    environment:
-      POSTGRES_DB: ${POSTGRES_DB:-moasem}
-      POSTGRES_USER: ${POSTGRES_USER}
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
-    volumes:
-      - postgres_data:/var/lib/postgresql/data
-    healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
-      interval: 10s
-      timeout: 5s
-      retries: 5
-
   redis:
     image: redis:7-alpine
     container_name: moasem-redis
@@ -43,14 +27,15 @@ services:
       - "8080:8080"
     environment:
       SPRING_PROFILES_ACTIVE: prod
-      DB_URL: jdbc:postgresql://db:5432/${POSTGRES_DB:-moasem}
-      DB_USERNAME: ${POSTGRES_USER}
-      DB_PASSWORD: ${POSTGRES_PASSWORD}
+      # :? 를 붙여 값이 없으면 컨테이너를 올리기 전에 멈춘다.
+      # 비워 두면 jdbc:postgresql://:5432/ 같은 URL이 만들어져
+      # 원인을 알기 어려운 연결 실패로 이어진다.
+      DB_URL: jdbc:postgresql://${DB_HOST:?.env에 DB_HOST가 없습니다}:5432/${POSTGRES_DB:-moasem}
+      DB_USERNAME: ${POSTGRES_USER:?.env에 POSTGRES_USER가 없습니다}
+      DB_PASSWORD: ${POSTGRES_PASSWORD:?.env에 POSTGRES_PASSWORD가 없습니다}
       REDIS_HOST: redis
       REDIS_PORT: 6379
     depends_on:
-      db:
-        condition: service_healthy
       redis:
         condition: service_healthy
     healthcheck:
@@ -63,5 +48,4 @@ services:
       start_period: 40s
 
 volumes:
-  postgres_data:
   redis_data:
