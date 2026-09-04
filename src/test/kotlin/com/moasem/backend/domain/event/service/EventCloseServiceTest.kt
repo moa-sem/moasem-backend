@@ -6,6 +6,8 @@ import com.moasem.backend.domain.event.repository.EventRepository
 import com.moasem.backend.domain.event.service.port.GroupAccessProvider
 import com.moasem.backend.domain.event.service.port.PendingSpendingCountProvider
 import com.moasem.backend.domain.event.service.port.ReportGenerationRequester
+import com.moasem.backend.global.error.ErrorCode
+import com.moasem.backend.global.error.hasErrorCode
 import io.mockk.every
 import io.mockk.mockk
 import io.mockk.verify
@@ -96,8 +98,7 @@ class EventCloseServiceTest {
             every { groupAccessProvider.isOwner(GROUP_ID, OWNER_ID) } returns false
 
             assertThatThrownBy { closeEvent() }
-                .isInstanceOf(IllegalStateException::class.java)
-                .hasMessageContaining("모임장만")
+                .hasErrorCode(ErrorCode.NOT_GROUP_OWNER)
 
             verify(exactly = 0) { eventRepository.findByIdAndGroupIdAndDeletedAtIsNullForUpdate(any(), any()) }
             verifyClosePortsNotCalled()
@@ -108,8 +109,7 @@ class EventCloseServiceTest {
             every { groupAccessProvider.isMember(GROUP_ID, OWNER_ID) } returns false
 
             assertThatThrownBy { closeEvent() }
-                .isInstanceOf(IllegalStateException::class.java)
-                .hasMessageContaining("모임 구성원만")
+                .hasErrorCode(ErrorCode.NOT_GROUP_MEMBER)
 
             verify(exactly = 0) { groupAccessProvider.isOwner(any(), any()) }
             verify(exactly = 0) { eventRepository.findByIdAndGroupIdAndDeletedAtIsNullForUpdate(any(), any()) }
@@ -121,8 +121,7 @@ class EventCloseServiceTest {
             every { groupAccessProvider.existsGroup(GROUP_ID) } returns false
 
             assertThatThrownBy { closeEvent() }
-                .isInstanceOf(IllegalStateException::class.java)
-                .hasMessageContaining("모임을 찾을 수 없습니다")
+                .hasErrorCode(ErrorCode.GROUP_NOT_FOUND)
 
             verify(exactly = 0) { groupAccessProvider.isMember(any(), any()) }
             verify(exactly = 0) { groupAccessProvider.isOwner(any(), any()) }
@@ -137,8 +136,7 @@ class EventCloseServiceTest {
             } returns null
 
             assertThatThrownBy { closeEvent() }
-                .isInstanceOf(NoSuchElementException::class.java)
-                .hasMessageContaining("행사를 찾을 수 없습니다")
+                .hasErrorCode(ErrorCode.EVENT_NOT_FOUND)
 
             verifyClosePortsNotCalled()
         }
@@ -150,7 +148,7 @@ class EventCloseServiceTest {
             } returns null
 
             assertThatThrownBy { closeEvent() }
-                .isInstanceOf(NoSuchElementException::class.java)
+                .hasErrorCode(ErrorCode.EVENT_NOT_FOUND)
 
             verifyClosePortsNotCalled()
         }
@@ -162,7 +160,7 @@ class EventCloseServiceTest {
             } returns null
 
             assertThatThrownBy { closeEvent() }
-                .isInstanceOf(NoSuchElementException::class.java)
+                .hasErrorCode(ErrorCode.EVENT_NOT_FOUND)
 
             verify { eventRepository.findByIdAndGroupIdAndDeletedAtIsNullForUpdate(EVENT_ID, GROUP_ID) }
             verifyClosePortsNotCalled()
@@ -175,8 +173,7 @@ class EventCloseServiceTest {
             } returns closedEvent(EVENT_ID)
 
             assertThatThrownBy { closeEvent() }
-                .isInstanceOf(IllegalStateException::class.java)
-                .hasMessageContaining("진행 중인 행사")
+                .hasErrorCode(ErrorCode.EVENT_ALREADY_CLOSED)
 
             verifyClosePortsNotCalled()
         }
@@ -190,8 +187,7 @@ class EventCloseServiceTest {
 
             listOf(0, -1).forEach { invalidParticipantCount ->
                 assertThatThrownBy { closeEvent(participantCount = invalidParticipantCount) }
-                    .isInstanceOf(IllegalArgumentException::class.java)
-                    .hasMessageContaining("1명 이상")
+                    .hasErrorCode(ErrorCode.INVALID_INPUT_VALUE)
             }
 
             assertThat(event.status).isEqualTo(EventStatus.ACTIVE)
@@ -209,8 +205,7 @@ class EventCloseServiceTest {
             every { pendingSpendingCountProvider.getPendingSpendingCount(EVENT_ID) } returns 1L
 
             assertThatThrownBy { closeEvent() }
-                .isInstanceOf(IllegalStateException::class.java)
-                .hasMessageContaining("대기 중인 지출 신청")
+                .hasErrorCode(ErrorCode.EVENT_HAS_PENDING_SPENDING)
 
             assertThat(event.status).isEqualTo(EventStatus.ACTIVE)
             assertThat(event.participantCount).isNull()

@@ -8,6 +8,8 @@ import com.moasem.backend.domain.event.repository.EventRepository
 import com.moasem.backend.domain.event.repository.BudgetAdditionRepository
 import com.moasem.backend.domain.event.service.port.GroupAccessProvider
 import com.moasem.backend.domain.event.service.port.ApprovedSpendingTotalProvider
+import com.moasem.backend.global.error.ErrorCode
+import com.moasem.backend.global.error.hasErrorCode
 import io.mockk.every
 import io.mockk.mockk
 import io.mockk.slot
@@ -88,8 +90,7 @@ class EventServiceTest {
         @Test
         fun `공백 제목은 생성하지 않는다`() {
             assertThatThrownBy { eventService.createEvent(GROUP_ID, OWNER_ID, createRequest(title = "   ")) }
-                .isInstanceOf(IllegalArgumentException::class.java)
-                .hasMessageContaining("제목")
+                .hasErrorCode(ErrorCode.INVALID_INPUT_VALUE)
 
             verify(exactly = 0) { eventRepository.save(any()) }
         }
@@ -97,8 +98,7 @@ class EventServiceTest {
         @Test
         fun `100자 초과 제목은 생성하지 않는다`() {
             assertThatThrownBy { eventService.createEvent(GROUP_ID, OWNER_ID, createRequest(title = "가".repeat(101))) }
-                .isInstanceOf(IllegalArgumentException::class.java)
-                .hasMessageContaining("100자")
+                .hasErrorCode(ErrorCode.INVALID_INPUT_VALUE)
 
             verify(exactly = 0) { eventRepository.save(any()) }
         }
@@ -106,8 +106,7 @@ class EventServiceTest {
         @Test
         fun `음수 최초 예산은 생성하지 않는다`() {
             assertThatThrownBy { eventService.createEvent(GROUP_ID, OWNER_ID, createRequest(initialBudget = -1L)) }
-                .isInstanceOf(IllegalArgumentException::class.java)
-                .hasMessageContaining("최초 예산")
+                .hasErrorCode(ErrorCode.INVALID_INPUT_VALUE)
 
             verify(exactly = 0) { eventRepository.save(any()) }
         }
@@ -127,8 +126,7 @@ class EventServiceTest {
             every { groupAccessProvider.existsGroup(GROUP_ID) } returns false
 
             assertThatThrownBy { eventService.createEvent(GROUP_ID, OWNER_ID, createRequest()) }
-                .isInstanceOf(IllegalStateException::class.java)
-                .hasMessageContaining("모임을 찾을 수 없습니다")
+                .hasErrorCode(ErrorCode.GROUP_NOT_FOUND)
 
             verify(exactly = 0) { eventRepository.save(any()) }
         }
@@ -138,8 +136,7 @@ class EventServiceTest {
             every { groupAccessProvider.isMember(GROUP_ID, OWNER_ID) } returns false
 
             assertThatThrownBy { eventService.createEvent(GROUP_ID, OWNER_ID, createRequest()) }
-                .isInstanceOf(IllegalStateException::class.java)
-                .hasMessageContaining("모임 구성원만")
+                .hasErrorCode(ErrorCode.NOT_GROUP_MEMBER)
 
             verify(exactly = 0) { eventRepository.save(any()) }
         }
@@ -149,8 +146,7 @@ class EventServiceTest {
             every { groupAccessProvider.isOwner(GROUP_ID, OWNER_ID) } returns false
 
             assertThatThrownBy { eventService.createEvent(GROUP_ID, OWNER_ID, createRequest()) }
-                .isInstanceOf(IllegalStateException::class.java)
-                .hasMessageContaining("모임장만")
+                .hasErrorCode(ErrorCode.NOT_GROUP_OWNER)
 
             verify(exactly = 0) { eventRepository.save(any()) }
         }
@@ -161,8 +157,25 @@ class EventServiceTest {
 
             assertThatThrownBy {
                 eventService.createEvent(GROUP_ID, OWNER_ID, createRequest(startAt = startAt, endAt = startAt))
-            }.isInstanceOf(IllegalArgumentException::class.java)
-                .hasMessageContaining("종료 시각")
+            }.hasErrorCode(ErrorCode.INVALID_INPUT_VALUE)
+
+            verify(exactly = 0) { eventRepository.save(any()) }
+        }
+
+        @Test
+        fun `시작 시각이 없으면 생성하지 않는다`() {
+            assertThatThrownBy {
+                eventService.createEvent(GROUP_ID, OWNER_ID, createRequest(startAt = null))
+            }.hasErrorCode(ErrorCode.INVALID_INPUT_VALUE)
+
+            verify(exactly = 0) { eventRepository.save(any()) }
+        }
+
+        @Test
+        fun `종료 시각이 없으면 생성하지 않는다`() {
+            assertThatThrownBy {
+                eventService.createEvent(GROUP_ID, OWNER_ID, createRequest(endAt = null))
+            }.hasErrorCode(ErrorCode.INVALID_INPUT_VALUE)
 
             verify(exactly = 0) { eventRepository.save(any()) }
         }
@@ -221,8 +234,7 @@ class EventServiceTest {
             every { groupAccessProvider.isMember(GROUP_ID, OWNER_ID) } returns false
 
             assertThatThrownBy { eventService.getEvent(GROUP_ID, EVENT_ID, OWNER_ID) }
-                .isInstanceOf(IllegalStateException::class.java)
-                .hasMessageContaining("모임 구성원만")
+                .hasErrorCode(ErrorCode.NOT_GROUP_MEMBER)
 
             verify(exactly = 0) { approvedSpendingTotalProvider.getApprovedSpendingTotal(any()) }
         }
@@ -296,8 +308,7 @@ class EventServiceTest {
             every { eventRepository.findByIdAndGroupIdAndDeletedAtIsNull(EVENT_ID, GROUP_ID) } returns null
 
             assertThatThrownBy { eventService.getEvent(GROUP_ID, EVENT_ID, OWNER_ID) }
-                .isInstanceOf(NoSuchElementException::class.java)
-                .hasMessageContaining("행사를 찾을 수 없습니다")
+                .hasErrorCode(ErrorCode.EVENT_NOT_FOUND)
 
             verify(exactly = 0) { approvedSpendingTotalProvider.getApprovedSpendingTotal(any()) }
         }
@@ -307,7 +318,7 @@ class EventServiceTest {
             every { eventRepository.findByIdAndGroupIdAndDeletedAtIsNull(EVENT_ID, GROUP_ID) } returns null
 
             assertThatThrownBy { eventService.getEvent(GROUP_ID, EVENT_ID, OWNER_ID) }
-                .isInstanceOf(NoSuchElementException::class.java)
+                .hasErrorCode(ErrorCode.EVENT_NOT_FOUND)
 
             verify(exactly = 0) { approvedSpendingTotalProvider.getApprovedSpendingTotal(any()) }
         }
@@ -317,7 +328,7 @@ class EventServiceTest {
             every { eventRepository.findByIdAndGroupIdAndDeletedAtIsNull(EVENT_ID, GROUP_ID) } returns null
 
             assertThatThrownBy { eventService.getEvent(GROUP_ID, EVENT_ID, OWNER_ID) }
-                .isInstanceOf(NoSuchElementException::class.java)
+                .hasErrorCode(ErrorCode.EVENT_NOT_FOUND)
 
             verify { eventRepository.findByIdAndGroupIdAndDeletedAtIsNull(EVENT_ID, GROUP_ID) }
             verify(exactly = 0) { approvedSpendingTotalProvider.getApprovedSpendingTotal(any()) }
@@ -327,8 +338,8 @@ class EventServiceTest {
     private fun createRequest(
         title: String = "여름 MT",
         description: String? = null,
-        startAt: LocalDateTime = LocalDateTime.of(2026, 8, 28, 10, 0),
-        endAt: LocalDateTime = LocalDateTime.of(2026, 8, 30, 12, 0),
+        startAt: LocalDateTime? = LocalDateTime.of(2026, 8, 28, 10, 0),
+        endAt: LocalDateTime? = LocalDateTime.of(2026, 8, 30, 12, 0),
         initialBudget: Long = 500_000L,
     ) = CreateEventRequest(
         title = title,

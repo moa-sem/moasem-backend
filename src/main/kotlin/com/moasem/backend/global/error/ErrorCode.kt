@@ -38,6 +38,8 @@ enum class ErrorCode(val status: HttpStatus, val message: String) {
     EVENT_NOT_FOUND(HttpStatus.NOT_FOUND, "행사를 찾을 수 없습니다."),
     EVENT_ALREADY_CLOSED(HttpStatus.CONFLICT, "이미 마감된 행사입니다."),
     EVENT_NOT_CLOSED(HttpStatus.CONFLICT, "마감되지 않은 행사입니다."),
+    EVENT_HAS_SPENDING_HISTORY(HttpStatus.CONFLICT, "지출 신청 이력이 있는 행사는 삭제할 수 없습니다."),
+    EVENT_HAS_PENDING_SPENDING(HttpStatus.CONFLICT, "대기 중인 지출 신청이 있는 행사는 마감할 수 없습니다."),
 
     // 지출
     SPENDING_NOT_FOUND(HttpStatus.NOT_FOUND, "지출 내역을 찾을 수 없습니다."),

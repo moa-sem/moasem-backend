@@ -7,6 +7,8 @@ import com.moasem.backend.domain.event.repository.EventRepository
 import com.moasem.backend.domain.event.service.port.ApprovedSpendingTotalProvider
 import com.moasem.backend.domain.event.service.port.GroupAccessProvider
 import com.moasem.backend.domain.event.service.port.PendingSpendingCountProvider
+import com.moasem.backend.global.error.ErrorCode
+import com.moasem.backend.global.error.hasErrorCode
 import io.mockk.every
 import io.mockk.mockk
 import io.mockk.verify
@@ -81,8 +83,7 @@ class EventClosePreviewServiceTest {
             every { groupAccessProvider.isOwner(GROUP_ID, OWNER_ID) } returns false
 
             assertThatThrownBy { previewClose() }
-                .isInstanceOf(IllegalStateException::class.java)
-                .hasMessageContaining("모임장만")
+                .hasErrorCode(ErrorCode.NOT_GROUP_OWNER)
 
             verify(exactly = 0) { eventRepository.findByIdAndGroupIdAndDeletedAtIsNull(any(), any()) }
             verifyPreviewPortsNotCalled()
@@ -93,8 +94,7 @@ class EventClosePreviewServiceTest {
             every { groupAccessProvider.isMember(GROUP_ID, OWNER_ID) } returns false
 
             assertThatThrownBy { previewClose() }
-                .isInstanceOf(IllegalStateException::class.java)
-                .hasMessageContaining("모임 구성원만")
+                .hasErrorCode(ErrorCode.NOT_GROUP_MEMBER)
 
             verify(exactly = 0) { groupAccessProvider.isOwner(any(), any()) }
             verify(exactly = 0) { eventRepository.findByIdAndGroupIdAndDeletedAtIsNull(any(), any()) }
@@ -106,8 +106,7 @@ class EventClosePreviewServiceTest {
             every { groupAccessProvider.existsGroup(GROUP_ID) } returns false
 
             assertThatThrownBy { previewClose() }
-                .isInstanceOf(IllegalStateException::class.java)
-                .hasMessageContaining("모임을 찾을 수 없습니다")
+                .hasErrorCode(ErrorCode.GROUP_NOT_FOUND)
 
             verify(exactly = 0) { groupAccessProvider.isMember(any(), any()) }
             verify(exactly = 0) { groupAccessProvider.isOwner(any(), any()) }
@@ -120,8 +119,7 @@ class EventClosePreviewServiceTest {
             every { eventRepository.findByIdAndGroupIdAndDeletedAtIsNull(EVENT_ID, GROUP_ID) } returns null
 
             assertThatThrownBy { previewClose() }
-                .isInstanceOf(NoSuchElementException::class.java)
-                .hasMessageContaining("행사를 찾을 수 없습니다")
+                .hasErrorCode(ErrorCode.EVENT_NOT_FOUND)
 
             verifyPreviewPortsNotCalled()
         }
@@ -131,7 +129,7 @@ class EventClosePreviewServiceTest {
             every { eventRepository.findByIdAndGroupIdAndDeletedAtIsNull(EVENT_ID, GROUP_ID) } returns null
 
             assertThatThrownBy { previewClose() }
-                .isInstanceOf(NoSuchElementException::class.java)
+                .hasErrorCode(ErrorCode.EVENT_NOT_FOUND)
 
             verifyPreviewPortsNotCalled()
         }
@@ -141,7 +139,7 @@ class EventClosePreviewServiceTest {
             every { eventRepository.findByIdAndGroupIdAndDeletedAtIsNull(EVENT_ID, GROUP_ID) } returns null
 
             assertThatThrownBy { previewClose() }
-                .isInstanceOf(NoSuchElementException::class.java)
+                .hasErrorCode(ErrorCode.EVENT_NOT_FOUND)
 
             verify { eventRepository.findByIdAndGroupIdAndDeletedAtIsNull(EVENT_ID, GROUP_ID) }
             verifyPreviewPortsNotCalled()
@@ -154,8 +152,7 @@ class EventClosePreviewServiceTest {
             } returns event(EVENT_ID, EventStatus.CLOSED)
 
             assertThatThrownBy { previewClose() }
-                .isInstanceOf(IllegalStateException::class.java)
-                .hasMessageContaining("진행 중인 행사")
+                .hasErrorCode(ErrorCode.EVENT_ALREADY_CLOSED)
 
             verifyPreviewPortsNotCalled()
         }
@@ -164,8 +161,7 @@ class EventClosePreviewServiceTest {
         fun `참여 인원이 0명 또는 음수이면 마감 미리보기를 조회할 수 없다`() {
             listOf(0, -1).forEach { invalidParticipantCount ->
                 assertThatThrownBy { previewClose(participantCount = invalidParticipantCount) }
-                    .isInstanceOf(IllegalArgumentException::class.java)
-                    .hasMessageContaining("1명 이상")
+                    .hasErrorCode(ErrorCode.INVALID_INPUT_VALUE)
             }
 
             verifyPreviewPortsNotCalled()
@@ -183,8 +179,7 @@ class EventClosePreviewServiceTest {
             every { pendingSpendingCountProvider.getPendingSpendingCount(EVENT_ID) } returns 2L
 
             assertThatThrownBy { previewClose() }
-                .isInstanceOf(IllegalStateException::class.java)
-                .hasMessageContaining("대기 중인 지출 신청")
+                .hasErrorCode(ErrorCode.EVENT_HAS_PENDING_SPENDING)
 
             verify(exactly = 0) { budgetAdditionRepository.sumAmountByEventId(any()) }
             verify(exactly = 0) { approvedSpendingTotalProvider.getApprovedSpendingTotal(any()) }
