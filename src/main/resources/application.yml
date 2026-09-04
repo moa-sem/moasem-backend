@@ -3,6 +3,8 @@ spring:
     name: moasem-backend
   profiles:
     active: local
+  config:
+    import: "optional:file:.env[.properties]"
   jpa:
     properties:
       hibernate:
@@ -10,6 +12,13 @@ spring:
         type.json_format_mapper: com.moasem.backend.global.config.KotlinJsonFormatMapper
 
 moasem:
+  oauth2:
+    google:
+      client-id: ${GOOGLE_CLIENT_ID}
+  jwt:
+    secret: ${JWT_SECRET}
+    access-token-expiration-ms: 3600000
+    refresh-token-expiration-ms: 1209600000
   ai:
     gemini:
       # 키는 여기 두지 않는다. 환경변수 GEMINI_API_KEY로만 들어온다.
