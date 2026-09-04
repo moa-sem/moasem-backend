@@ -42,6 +42,8 @@ services:
       DB_USERNAME: postgres
       DB_PASSWORD: postgres
       REDIS_HOST: redis
+      # 호스트에 키가 있으면 넘겨주고, 없으면 비운다. 없어도 앱은 정상 기동한다.
+      GEMINI_API_KEY: ${GEMINI_API_KEY:-}
     depends_on:
       db:
         condition: service_healthy
