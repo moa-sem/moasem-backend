@@ -14,6 +14,7 @@ import com.moasem.backend.domain.report.service.ReportRetryService
 import com.moasem.backend.global.error.BusinessException
 import com.moasem.backend.global.error.ErrorCode
 import com.moasem.backend.global.error.GlobalExceptionHandler
+import com.moasem.backend.global.security.JwtAuthenticationFilter
 import com.ninjasquad.springmockk.MockkBean
 import io.mockk.every
 import org.junit.jupiter.api.DisplayName
@@ -22,6 +23,7 @@ import org.springframework.beans.factory.annotation.Autowired
 import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc
 import org.springframework.boot.webmvc.test.autoconfigure.WebMvcTest
 import org.springframework.context.annotation.Import
+import org.springframework.test.context.ActiveProfiles
 import org.springframework.test.web.servlet.MockMvc
 import org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get
 import org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post
@@ -32,10 +34,14 @@ import java.time.LocalDateTime
 @WebMvcTest(controllers = [ReportController::class])
 @Import(GlobalExceptionHandler::class)
 @AutoConfigureMockMvc(addFilters = false)
+@ActiveProfiles("test")
 class ReportControllerTest {
 
     @Autowired
     private lateinit var mockMvc: MockMvc
+
+    @MockkBean
+    private lateinit var jwtAuthenticationFilter: JwtAuthenticationFilter
 
     @MockkBean
     private lateinit var reportQueryService: ReportQueryService

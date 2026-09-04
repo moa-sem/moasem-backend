@@ -13,6 +13,7 @@ import com.moasem.backend.domain.spending.service.SpendingService
 import com.moasem.backend.global.error.BusinessException
 import com.moasem.backend.global.error.ErrorCode
 import com.moasem.backend.global.error.GlobalExceptionHandler
+import com.moasem.backend.global.security.JwtAuthenticationFilter
 import com.ninjasquad.springmockk.MockkBean
 import io.mockk.every
 import org.junit.jupiter.api.DisplayName
@@ -21,6 +22,7 @@ import org.springframework.beans.factory.annotation.Autowired
 import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc
 import org.springframework.boot.webmvc.test.autoconfigure.WebMvcTest
 import org.springframework.context.annotation.Import
+import org.springframework.test.context.ActiveProfiles
 import org.springframework.data.domain.PageImpl
 import org.springframework.data.domain.PageRequest
 import org.springframework.http.MediaType
@@ -45,6 +47,7 @@ import java.time.LocalDateTime
 @WebMvcTest(controllers = [SpendingController::class])
 @Import(GlobalExceptionHandler::class)
 @AutoConfigureMockMvc(addFilters = false)
+@ActiveProfiles("test")
 class SpendingControllerTest {
 
     @Autowired
@@ -53,6 +56,9 @@ class SpendingControllerTest {
     /** Spring 본체가 쓰는 Jackson 3 매퍼다. 컨트롤러가 역직렬화에 쓰는 것과 같은 인스턴스를 쓴다. */
     @Autowired
     private lateinit var objectMapper: ObjectMapper
+
+    @MockkBean
+    private lateinit var jwtAuthenticationFilter: JwtAuthenticationFilter
 
     @MockkBean
     private lateinit var spendingService: SpendingService
