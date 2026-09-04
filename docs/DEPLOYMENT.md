@@ -45,8 +45,23 @@ cat > .env <<'ENV'
 POSTGRES_DB=moasem
 POSTGRES_USER=moasem
 POSTGRES_PASSWORD=<강력한_비밀번호>
+GEMINI_API_KEY=<Gemini_API_키>
 ENV
 chmod 600 .env
+```
+
+`GEMINI_API_KEY` 는 결산 보고서의 AI 총평에 쓴다.
+비워 두거나 아예 넣지 않아도 배포는 정상이며, AI 총평만 빠지고 보고서는 그대로 생성된다.
+
+개인 계정 키 대신 **프로젝트용으로 따로 발급한 키**를 넣는다.
+개인 키를 쓰면 발급자가 키를 폐기·교체할 때 서버가 같이 멈춘다.
+키는 [Google AI Studio](https://aistudio.google.com/apikey)에서 발급한다.
+
+키를 나중에 추가하거나 바꿀 때는 `.env` 를 고치고 컨테이너만 다시 올리면 된다.
+
+```bash
+cd ~/moasem
+docker compose -f docker-compose.prod.yml up -d app
 ```
 
 ### 3.3 보안 그룹
