@@ -14,6 +14,7 @@ import com.moasem.backend.domain.report.service.ReportRetryService
 import com.moasem.backend.global.error.BusinessException
 import com.moasem.backend.global.error.ErrorCode
 import com.moasem.backend.global.error.GlobalExceptionHandler
+import com.moasem.backend.global.security.JwtAuthenticationFilter
 import com.ninjasquad.springmockk.MockkBean
 import io.mockk.every
 import org.junit.jupiter.api.DisplayName
@@ -36,6 +37,9 @@ class ReportControllerTest {
 
     @Autowired
     private lateinit var mockMvc: MockMvc
+
+    @MockkBean
+    private lateinit var jwtAuthenticationFilter: JwtAuthenticationFilter
 
     @MockkBean
     private lateinit var reportQueryService: ReportQueryService

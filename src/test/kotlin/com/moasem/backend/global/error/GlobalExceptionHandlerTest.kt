@@ -4,6 +4,8 @@ import com.moasem.backend.global.response.ApiResponse
 import jakarta.validation.Valid
 import jakarta.validation.constraints.Min
 import jakarta.validation.constraints.NotBlank
+import com.moasem.backend.global.security.JwtAuthenticationFilter
+import com.ninjasquad.springmockk.MockkBean
 import org.junit.jupiter.api.DisplayName
 import org.junit.jupiter.api.Test
 import org.springframework.beans.factory.annotation.Autowired
@@ -35,6 +37,9 @@ class GlobalExceptionHandlerTest {
 
     @Autowired
     private lateinit var mockMvc: MockMvc
+
+    @MockkBean
+    private lateinit var jwtAuthenticationFilter: JwtAuthenticationFilter
 
     @Test
     @DisplayName("성공 응답에 success, code, message가 담긴다")

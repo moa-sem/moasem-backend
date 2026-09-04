@@ -13,6 +13,7 @@ import com.moasem.backend.domain.spending.service.SpendingService
 import com.moasem.backend.global.error.BusinessException
 import com.moasem.backend.global.error.ErrorCode
 import com.moasem.backend.global.error.GlobalExceptionHandler
+import com.moasem.backend.global.security.JwtAuthenticationFilter
 import com.ninjasquad.springmockk.MockkBean
 import io.mockk.every
 import org.junit.jupiter.api.DisplayName
@@ -53,6 +54,9 @@ class SpendingControllerTest {
     /** Spring 본체가 쓰는 Jackson 3 매퍼다. 컨트롤러가 역직렬화에 쓰는 것과 같은 인스턴스를 쓴다. */
     @Autowired
     private lateinit var objectMapper: ObjectMapper
+
+    @MockkBean
+    private lateinit var jwtAuthenticationFilter: JwtAuthenticationFilter
 
     @MockkBean
     private lateinit var spendingService: SpendingService

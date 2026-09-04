@@ -23,6 +23,15 @@ spring:
       host: localhost
       port: 6379
 
+moasem:
+  oauth2:
+    google:
+      client-id: test-google-client-id
+  jwt:
+    secret: test-secret-key-for-jwt-unit-tests-only-32bytes!!
+    access-token-expiration-ms: 3600000
+    refresh-token-expiration-ms: 1209600000
+
 logging:
   level:
     com.moasem: info
