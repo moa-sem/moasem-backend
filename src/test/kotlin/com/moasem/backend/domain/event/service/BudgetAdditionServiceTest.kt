@@ -7,6 +7,8 @@ import com.moasem.backend.domain.event.entity.EventStatus
 import com.moasem.backend.domain.event.repository.BudgetAdditionRepository
 import com.moasem.backend.domain.event.repository.EventRepository
 import com.moasem.backend.domain.event.service.port.GroupAccessProvider
+import com.moasem.backend.global.error.ErrorCode
+import com.moasem.backend.global.error.hasErrorCode
 import io.mockk.every
 import io.mockk.mockk
 import io.mockk.slot
@@ -67,8 +69,7 @@ class BudgetAdditionServiceTest {
             every { groupAccessProvider.isOwner(GROUP_ID, OWNER_ID) } returns false
 
             assertThatThrownBy { budgetAdditionService.addBudgetAddition(GROUP_ID, EVENT_ID, OWNER_ID, request()) }
-                .isInstanceOf(IllegalStateException::class.java)
-                .hasMessageContaining("모임장만")
+                .hasErrorCode(ErrorCode.NOT_GROUP_OWNER)
 
             verify(exactly = 0) { budgetAdditionRepository.save(any()) }
         }
@@ -78,8 +79,7 @@ class BudgetAdditionServiceTest {
             every { groupAccessProvider.isMember(GROUP_ID, OWNER_ID) } returns false
 
             assertThatThrownBy { budgetAdditionService.addBudgetAddition(GROUP_ID, EVENT_ID, OWNER_ID, request()) }
-                .isInstanceOf(IllegalStateException::class.java)
-                .hasMessageContaining("모임 구성원만")
+                .hasErrorCode(ErrorCode.NOT_GROUP_MEMBER)
 
             verify(exactly = 0) { budgetAdditionRepository.save(any()) }
         }
@@ -89,8 +89,7 @@ class BudgetAdditionServiceTest {
             every { groupAccessProvider.existsGroup(GROUP_ID) } returns false
 
             assertThatThrownBy { budgetAdditionService.addBudgetAddition(GROUP_ID, EVENT_ID, OWNER_ID, request()) }
-                .isInstanceOf(IllegalStateException::class.java)
-                .hasMessageContaining("모임을 찾을 수 없습니다")
+                .hasErrorCode(ErrorCode.GROUP_NOT_FOUND)
 
             verify(exactly = 0) { budgetAdditionRepository.save(any()) }
         }
@@ -100,8 +99,7 @@ class BudgetAdditionServiceTest {
             every { eventRepository.findByIdAndGroupIdAndDeletedAtIsNull(EVENT_ID, GROUP_ID) } returns null
 
             assertThatThrownBy { budgetAdditionService.addBudgetAddition(GROUP_ID, EVENT_ID, OWNER_ID, request()) }
-                .isInstanceOf(NoSuchElementException::class.java)
-                .hasMessageContaining("행사를 찾을 수 없습니다")
+                .hasErrorCode(ErrorCode.EVENT_NOT_FOUND)
 
             verify(exactly = 0) { budgetAdditionRepository.save(any()) }
         }
@@ -111,7 +109,7 @@ class BudgetAdditionServiceTest {
             every { eventRepository.findByIdAndGroupIdAndDeletedAtIsNull(EVENT_ID, GROUP_ID) } returns null
 
             assertThatThrownBy { budgetAdditionService.addBudgetAddition(GROUP_ID, EVENT_ID, OWNER_ID, request()) }
-                .isInstanceOf(NoSuchElementException::class.java)
+                .hasErrorCode(ErrorCode.EVENT_NOT_FOUND)
 
             verify(exactly = 0) { budgetAdditionRepository.save(any()) }
         }
@@ -123,8 +121,7 @@ class BudgetAdditionServiceTest {
             } returns event(EVENT_ID, EventStatus.CLOSED)
 
             assertThatThrownBy { budgetAdditionService.addBudgetAddition(GROUP_ID, EVENT_ID, OWNER_ID, request()) }
-                .isInstanceOf(IllegalStateException::class.java)
-                .hasMessageContaining("진행 중인 행사")
+                .hasErrorCode(ErrorCode.EVENT_ALREADY_CLOSED)
 
             verify(exactly = 0) { budgetAdditionRepository.save(any()) }
         }
@@ -134,7 +131,7 @@ class BudgetAdditionServiceTest {
             every { eventRepository.findByIdAndGroupIdAndDeletedAtIsNull(EVENT_ID, GROUP_ID) } returns null
 
             assertThatThrownBy { budgetAdditionService.addBudgetAddition(GROUP_ID, EVENT_ID, OWNER_ID, request()) }
-                .isInstanceOf(NoSuchElementException::class.java)
+                .hasErrorCode(ErrorCode.EVENT_NOT_FOUND)
 
             verify(exactly = 0) { budgetAdditionRepository.save(any()) }
         }
@@ -142,9 +139,9 @@ class BudgetAdditionServiceTest {
         @Test
         fun `0원과 음수 금액은 등록할 수 없다`() {
             assertThatThrownBy { budgetAdditionService.addBudgetAddition(GROUP_ID, EVENT_ID, OWNER_ID, request(amount = 0L)) }
-                .isInstanceOf(IllegalArgumentException::class.java)
+                .hasErrorCode(ErrorCode.INVALID_INPUT_VALUE)
             assertThatThrownBy { budgetAdditionService.addBudgetAddition(GROUP_ID, EVENT_ID, OWNER_ID, request(amount = -1L)) }
-                .isInstanceOf(IllegalArgumentException::class.java)
+                .hasErrorCode(ErrorCode.INVALID_INPUT_VALUE)
 
             verify(exactly = 0) { budgetAdditionRepository.save(any()) }
         }
@@ -152,8 +149,7 @@ class BudgetAdditionServiceTest {
         @Test
         fun `공백 사유는 등록할 수 없다`() {
             assertThatThrownBy { budgetAdditionService.addBudgetAddition(GROUP_ID, EVENT_ID, OWNER_ID, request(reason = "   ")) }
-                .isInstanceOf(IllegalArgumentException::class.java)
-                .hasMessageContaining("사유")
+                .hasErrorCode(ErrorCode.INVALID_INPUT_VALUE)
 
             verify(exactly = 0) { budgetAdditionRepository.save(any()) }
         }

@@ -5,6 +5,8 @@ import com.moasem.backend.domain.event.entity.EventStatus
 import com.moasem.backend.domain.event.repository.EventRepository
 import com.moasem.backend.domain.event.service.port.GroupAccessProvider
 import com.moasem.backend.domain.event.service.port.SpendingHistoryProvider
+import com.moasem.backend.global.error.ErrorCode
+import com.moasem.backend.global.error.hasErrorCode
 import io.mockk.every
 import io.mockk.mockk
 import io.mockk.verify
@@ -54,8 +56,7 @@ class EventDeletionServiceTest {
             every { groupAccessProvider.isOwner(GROUP_ID, OWNER_ID) } returns false
 
             assertThatThrownBy { eventDeletionService.deleteEvent(GROUP_ID, EVENT_ID, OWNER_ID) }
-                .isInstanceOf(IllegalStateException::class.java)
-                .hasMessageContaining("모임장만")
+                .hasErrorCode(ErrorCode.NOT_GROUP_OWNER)
 
             verify(exactly = 0) { eventRepository.delete(any<Event>()) }
         }
@@ -65,8 +66,7 @@ class EventDeletionServiceTest {
             every { groupAccessProvider.isMember(GROUP_ID, OWNER_ID) } returns false
 
             assertThatThrownBy { eventDeletionService.deleteEvent(GROUP_ID, EVENT_ID, OWNER_ID) }
-                .isInstanceOf(IllegalStateException::class.java)
-                .hasMessageContaining("모임 구성원만")
+                .hasErrorCode(ErrorCode.NOT_GROUP_MEMBER)
         }
 
         @Test
@@ -74,8 +74,7 @@ class EventDeletionServiceTest {
             every { groupAccessProvider.existsGroup(GROUP_ID) } returns false
 
             assertThatThrownBy { eventDeletionService.deleteEvent(GROUP_ID, EVENT_ID, OWNER_ID) }
-                .isInstanceOf(IllegalStateException::class.java)
-                .hasMessageContaining("모임을 찾을 수 없습니다")
+                .hasErrorCode(ErrorCode.GROUP_NOT_FOUND)
         }
 
         @Test
@@ -83,8 +82,7 @@ class EventDeletionServiceTest {
             every { eventRepository.findByIdAndGroupIdAndDeletedAtIsNull(EVENT_ID, GROUP_ID) } returns null
 
             assertThatThrownBy { eventDeletionService.deleteEvent(GROUP_ID, EVENT_ID, OWNER_ID) }
-                .isInstanceOf(NoSuchElementException::class.java)
-                .hasMessageContaining("행사를 찾을 수 없습니다")
+                .hasErrorCode(ErrorCode.EVENT_NOT_FOUND)
         }
 
         @Test
@@ -92,7 +90,7 @@ class EventDeletionServiceTest {
             every { eventRepository.findByIdAndGroupIdAndDeletedAtIsNull(EVENT_ID, GROUP_ID) } returns null
 
             assertThatThrownBy { eventDeletionService.deleteEvent(GROUP_ID, EVENT_ID, OWNER_ID) }
-                .isInstanceOf(NoSuchElementException::class.java)
+                .hasErrorCode(ErrorCode.EVENT_NOT_FOUND)
         }
 
         @Test
@@ -102,8 +100,7 @@ class EventDeletionServiceTest {
             } returns event(EVENT_ID, EventStatus.CLOSED)
 
             assertThatThrownBy { eventDeletionService.deleteEvent(GROUP_ID, EVENT_ID, OWNER_ID) }
-                .isInstanceOf(IllegalStateException::class.java)
-                .hasMessageContaining("진행 중인 행사")
+                .hasErrorCode(ErrorCode.EVENT_ALREADY_CLOSED)
         }
 
         @Test
@@ -111,8 +108,7 @@ class EventDeletionServiceTest {
             every { spendingHistoryProvider.hasAnySpending(EVENT_ID) } returns true
 
             assertThatThrownBy { eventDeletionService.deleteEvent(GROUP_ID, EVENT_ID, OWNER_ID) }
-                .isInstanceOf(IllegalStateException::class.java)
-                .hasMessageContaining("지출 신청 이력")
+                .hasErrorCode(ErrorCode.EVENT_HAS_SPENDING_HISTORY)
 
             verify { spendingHistoryProvider.hasAnySpending(EVENT_ID) }
             verify(exactly = 0) { eventRepository.delete(any<Event>()) }
@@ -123,7 +119,7 @@ class EventDeletionServiceTest {
             every { eventRepository.findByIdAndGroupIdAndDeletedAtIsNull(EVENT_ID, GROUP_ID) } returns null
 
             assertThatThrownBy { eventDeletionService.deleteEvent(GROUP_ID, EVENT_ID, OWNER_ID) }
-                .isInstanceOf(NoSuchElementException::class.java)
+                .hasErrorCode(ErrorCode.EVENT_NOT_FOUND)
 
             verify { eventRepository.findByIdAndGroupIdAndDeletedAtIsNull(EVENT_ID, GROUP_ID) }
         }
