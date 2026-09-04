@@ -3,8 +3,8 @@ package com.moasem.backend.domain.auth.service
 import com.moasem.backend.domain.auth.dto.GoogleTokenInfo
 import com.moasem.backend.domain.auth.dto.request.RefreshTokenRequest
 import com.moasem.backend.domain.auth.dto.response.TokenResponse
-import com.moasem.backend.domain.auth.entity.Member
-import com.moasem.backend.domain.auth.repository.MemberRepository
+import com.moasem.backend.domain.auth.entity.User
+import com.moasem.backend.domain.auth.repository.UserRepository
 import com.moasem.backend.global.security.JwtProvider
 import org.springframework.beans.factory.annotation.Value
 import org.springframework.data.redis.core.StringRedisTemplate
@@ -13,8 +13,8 @@ import org.springframework.web.client.RestClient
 import java.time.Duration
 
 @Service
-class GoogleAuthService (
-    private val memberRepository: MemberRepository,
+class GoogleAuthService(
+    private val userRepository: UserRepository,
     private val jwtProvider: JwtProvider,
     private val redisTemplate: StringRedisTemplate,
     @Value("\${moasem.oauth2.google.client-id}")
@@ -27,9 +27,9 @@ class GoogleAuthService (
     fun login(idToken: String): TokenResponse {
         val tokenInfo = verifyGoogleToken(idToken)
 
-        val member = memberRepository.findByGoogleSub(tokenInfo.sub)
-            ?: memberRepository.save(
-                Member(
+        val user = userRepository.findByGoogleSub(tokenInfo.sub)
+            ?: userRepository.save(
+                User(
                     googleSub = tokenInfo.sub,
                     email = tokenInfo.email,
                     name = tokenInfo.name,
@@ -37,27 +37,27 @@ class GoogleAuthService (
                 )
             )
 
-        val accessToken = jwtProvider.createAccessToken(member.id!!)
-        val refreshToken = jwtProvider.createRefreshToken(member.id!!)
+        val accessToken = jwtProvider.createAccessToken(user.id!!)
+        val refreshToken = jwtProvider.createRefreshToken(user.id!!)
         redisTemplate.opsForValue().set(
-            "refresh:${member.id}",
+            "refresh:${user.id}",
             refreshToken,
             Duration.ofMillis(refreshTokenExpirationMs)
         )
 
-        return TokenResponse (accessToken, refreshToken)
+        return TokenResponse(accessToken, refreshToken)
     }
 
     fun refresh(refreshTokenRequest: RefreshTokenRequest): TokenResponse {
         if (!jwtProvider.validateToken(refreshTokenRequest.refreshToken)) {
             throw IllegalArgumentException("유효하지 않은 refresh token 입니다.")
         }
-        val memberId = jwtProvider.extractMemberId(refreshTokenRequest.refreshToken)
-        val saved = redisTemplate.opsForValue().get("refresh:$memberId")
+        val userId = jwtProvider.extractUserId(refreshTokenRequest.refreshToken)
+        val saved = redisTemplate.opsForValue().get("refresh:$userId")
         if (saved != refreshTokenRequest.refreshToken) {
             throw IllegalArgumentException("유효하지 않은 refresh token 입니다.")
         }
-        val accessToken = jwtProvider.createAccessToken(memberId)
+        val accessToken = jwtProvider.createAccessToken(userId)
 
         return TokenResponse(accessToken, refreshTokenRequest.refreshToken)
     }
@@ -69,8 +69,7 @@ class GoogleAuthService (
             .body(GoogleTokenInfo::class.java)
             ?: throw IllegalArgumentException("유효하지 않은 Google 토큰입니다.")
 
-        require(tokenInfo.aud == googleClientId) {"토큰의 클라이언트 ID가 일치하지 않습니다."}
+        require(tokenInfo.aud == googleClientId) { "토큰의 클라이언트 ID가 일치하지 않습니다." }
         return tokenInfo
     }
-
 }

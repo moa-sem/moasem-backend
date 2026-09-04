@@ -21,31 +21,31 @@ class JwtProvider (
 ) {
     private val key: Key = Keys.hmacShaKeyFor(secretKeyString.toByteArray())
 
-    fun createAccessToken (memberId: Long): String {
+    fun createAccessToken(userId: Long): String {
         val now = Date()
         val validity = Date(now.time + accessTokenValidityInMilliseconds)
 
         return Jwts.builder()
-            .subject(memberId.toString())
+            .subject(userId.toString())
             .issuedAt(now)
             .expiration(validity)
             .signWith(key)
             .compact()
     }
 
-    fun createRefreshToken(memberId: Long): String {
+    fun createRefreshToken(userId: Long): String {
         val now = Date()
         val validity = Date(now.time + refreshTokenValidityInMilliseconds)
 
         return Jwts.builder()
-            .subject(memberId.toString())
+            .subject(userId.toString())
             .issuedAt(now)
             .expiration(validity)
             .signWith(key)
             .compact()
     }
 
-    fun extractMemberId(token: String): Long {
+    fun extractUserId(token: String): Long {
         return parseClaims(token).subject.toLong()
     }
 
