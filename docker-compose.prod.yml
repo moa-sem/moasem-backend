@@ -35,6 +35,8 @@ services:
       DB_PASSWORD: ${POSTGRES_PASSWORD:?.env에 POSTGRES_PASSWORD가 없습니다}
       REDIS_HOST: redis
       REDIS_PORT: 6379
+      # 결산 보고서 AI 총평. 비어 있으면 AI 없이 보고서만 생성된다.
+      GEMINI_API_KEY: ${GEMINI_API_KEY:-}
     depends_on:
       redis:
         condition: service_healthy

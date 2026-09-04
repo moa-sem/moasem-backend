@@ -41,40 +41,7 @@ CD는 `~/moasem` 에 `docker-compose.prod.yml` 을 전송하고, 같은 위치�
 
 ```bash
 mkdir -p ~/moasem && cd ~/moasem
-nano .env      # 히스토리에 값이 남지 않도록 편집기로 작성한다
-chmod 600 .env
-```
 
-```
-DB_HOST=<RDS 엔드포인트>
-POSTGRES_DB=moasem
-POSTGRES_USER=<RDS 마스터 사용자>
-POSTGRES_PASSWORD=<RDS 마스터 암호>
-```
-
-| 변수 | 값 | 확인 위치 |
-|---|---|---|
-| `DB_HOST` | RDS 엔드포인트 | RDS 콘솔 → 연결 & 보안 |
-| `POSTGRES_DB` | DB 이름 | RDS 콘솔 → 구성 |
-| `POSTGRES_USER` | 마스터 사용자 이름 | RDS 콘솔 → 구성 |
-| `POSTGRES_PASSWORD` | 마스터 암호 | **조회 불가.** 모르면 RDS 수정에서 재설정한다 |
-
-DB 인스턴스 **식별자**(`moasem-db`)는 AWS가 인스턴스를 구분하는 이름일 뿐이라
-어느 변수에도 들어가지 않는다.
-
-`POSTGRES_` 라는 접두사는 컨테이너 DB를 쓰던 때 붙은 이름이 그대로 남은 것이다.
-지금은 컨테이너를 만드는 값이 아니라 RDS에 접속하는 값이다.
-
-값이 하나라도 비면 `docker compose` 가 컨테이너를 올리기 전에 어떤 변수가
-없는지 알려주고 멈춘다. 비어 있는 채로 기동해 원인 불명의 연결 실패가 나는 것보다 낫다.
-
-`.env` 확인은 값이 화면에 찍히지 않도록 이름만 본다.
-
-```bash
-cut -d= -f1 .env
-```
-
-값을 바꾼 뒤에는 앱 컨테이너만 다시 올리면 된다.
 
 ```bash
 cd ~/moasem
