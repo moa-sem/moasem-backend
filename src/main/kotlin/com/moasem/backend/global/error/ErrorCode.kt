@@ -31,6 +31,7 @@ enum class ErrorCode(val status: HttpStatus, val message: String) {
 
     // 모임
     GROUP_NOT_FOUND(HttpStatus.NOT_FOUND, "모임을 찾을 수 없습니다."),
+    GROUP_MEMBER_NOT_FOUND(HttpStatus.NOT_FOUND, "모임 구성원을 찾을 수 없습니다."),
     NOT_GROUP_MEMBER(HttpStatus.FORBIDDEN, "모임 구성원이 아닙니다."),
     NOT_GROUP_OWNER(HttpStatus.FORBIDDEN, "모임장만 수행할 수 있습니다."),
 
