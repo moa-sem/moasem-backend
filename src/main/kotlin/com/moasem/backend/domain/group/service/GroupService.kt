@@ -57,6 +57,10 @@ class GroupService(
         val group = groupRepository.findByJoinCode(joinCode)
             ?: throw BusinessException(ErrorCode.GROUP_NOT_FOUND)
 
+        if (groupMemberRepository.existsByGroupAndUser(group, user)) {
+            throw BusinessException(ErrorCode.ALREADY_GROUP_MEMBER)
+        }
+
         groupMemberRepository.save(
             GroupMember(group = group, user = user, role = GroupRole.MEMBER)
         )
