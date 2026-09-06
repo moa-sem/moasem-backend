@@ -35,7 +35,10 @@ services:
       DB_PASSWORD: ${POSTGRES_PASSWORD:?.env에 POSTGRES_PASSWORD가 없습니다}
       REDIS_HOST: redis
       REDIS_PORT: 6379
-      # 결산 보고서 AI 총평. 비어 있으면 AI 없이 보고서만 생성된다.
+      # 없으면 앱이 기동하지 못하므로 컨테이너를 올리기 전에 멈춘다.
+      JWT_SECRET: ${JWT_SECRET:?.env에 JWT_SECRET이 없습니다}
+      GOOGLE_CLIENT_ID: ${GOOGLE_CLIENT_ID:?.env에 GOOGLE_CLIENT_ID가 없습니다}
+      # 결산 보고서 AI 총평. 이건 없어도 보고서는 생성되므로 기본값을 빈 값으로 둔다.
       GEMINI_API_KEY: ${GEMINI_API_KEY:-}
     depends_on:
       redis:
