@@ -41,7 +41,61 @@ CD는 `~/moasem` 에 `docker-compose.prod.yml` 을 전송하고, 같은 위치�
 
 ```bash
 mkdir -p ~/moasem && cd ~/moasem
+nano .env      # 히스토리에 값이 남지 않도록 편집기로 작성한다
+chmod 600 .env
+```
 
+```
+DB_HOST=<RDS 엔드포인트>
+POSTGRES_DB=moasem
+POSTGRES_USER=<RDS 마스터 사용자>
+POSTGRES_PASSWORD=<RDS 마스터 암호>
+JWT_SECRET=<직접 생성>
+GOOGLE_CLIENT_ID=<구글 OAuth 클라이언트 ID>
+GEMINI_API_KEY=<Gemini API 키>
+```
+
+| 변수 | 값 | 확인 위치 |
+|---|---|---|
+| `DB_HOST` | RDS 엔드포인트 | RDS 콘솔 → 연결 & 보안 |
+| `POSTGRES_DB` | DB 이름 | RDS 콘솔 → 구성 |
+| `POSTGRES_USER` | 마스터 사용자 이름 | RDS 콘솔 → 구성 |
+| `POSTGRES_PASSWORD` | 마스터 암호 | **조회 불가.** 모르면 RDS 수정에서 재설정한다 |
+| `JWT_SECRET` | 토큰 서명 키 | **직접 생성한다.** 아래 참고 |
+| `GOOGLE_CLIENT_ID` | 구글 OAuth 클라이언트 ID | 구글 클라우드 콘솔 |
+| `GEMINI_API_KEY` | 결산 AI 총평용 | [Google AI Studio](https://aistudio.google.com/apikey) |
+
+DB 인스턴스 **식별자**(`moasem-db`)는 AWS가 인스턴스를 구분하는 이름일 뿐이라
+어느 변수에도 들어가지 않는다.
+
+`POSTGRES_` 라는 접두사는 컨테이너 DB를 쓰던 때 붙은 이름이 그대로 남은 것이다.
+지금은 컨테이너를 만드는 값이 아니라 RDS에 접속하는 값이다.
+
+**`JWT_SECRET` 은 받아오는 값이 아니라 직접 만드는 값이다.** 서버에서 생성한다.
+
+```bash
+openssl rand -base64 48
+```
+
+토큰 서명에 쓰이므로 유출되면 누구나 우리 서버의 토큰을 위조할 수 있다. 공유하지 않는다.
+저장소에 들어 있는 로컬 개발용 값과 반드시 달라야 한다.
+값을 바꾸면 이미 발급된 토큰이 모두 무효가 되어 사용자가 다시 로그인해야 하므로,
+한 번 정한 뒤에는 바꾸지 않는 편이 낫다.
+
+`GEMINI_API_KEY` 는 비워 두어도 배포는 정상이며, AI 총평만 빠지고 보고서는 그대로 생성된다.
+나머지 변수는 하나라도 비면 `docker compose` 가 컨테이너를 올리기 전에 멈춘다.
+비어 있는 채로 기동해 원인 불명의 실패가 나는 것보다 낫다.
+
+개인 계정 키 대신 **프로젝트용으로 따로 발급한 키**를 넣는다.
+개인 키를 쓰면 발급자가 키를 폐기·교체할 때 서버가 같이 멈춘다.
+
+`.env` 확인은 값이 화면에 찍히지 않도록 이름만 본다.
+
+```bash
+cut -d= -f1 .env
+```
+
+값을 바꾼 뒤에는 앱 컨테이너만 다시 올리면 된다.
 
 ```bash
 cd ~/moasem
