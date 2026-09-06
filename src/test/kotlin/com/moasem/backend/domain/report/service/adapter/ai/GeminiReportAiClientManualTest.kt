@@ -10,11 +10,15 @@ import org.junit.jupiter.api.condition.EnabledIfEnvironmentVariable
 /**
  * 실제 Gemini API를 호출한다.
  *
- * 외부 서비스에 의존하고 요금·속도 제한이 걸리므로 CI에서는 돌지 않는다.
- * `GEMINI_API_KEY`가 있을 때만 실행된다.
- *
  * 프롬프트를 고칠 때 출력이 실제로 어떻게 달라지는지 확인하는 용도다.
+ *
+ * 실행하려면 `GEMINI_MANUAL_TEST=true` 를 함께 줘야 한다. 키가 있다는 이유만으로
+ * 돌게 두면, 키를 교체했거나 만료된 사람의 빌드가 401로 깨진다. 실제로 그런 일이 있었다.
+ * 외부 서비스 상태에 따라 결과가 달라지는 검사는 일반 빌드에 섞이지 않아야 한다.
+ *
+ *     GEMINI_MANUAL_TEST=true ./gradlew test --tests "*GeminiReportAiClientManualTest*"
  */
+@EnabledIfEnvironmentVariable(named = "GEMINI_MANUAL_TEST", matches = "true")
 @EnabledIfEnvironmentVariable(named = "GEMINI_API_KEY", matches = ".+")
 class GeminiReportAiClientManualTest {
 

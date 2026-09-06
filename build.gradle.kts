@@ -29,6 +29,13 @@ dependencies {
 	// Data
 	implementation("org.springframework.boot:spring-boot-starter-data-jpa")
 	runtimeOnly("org.postgresql:postgresql")
+
+	// 스키마 마이그레이션 (db/migration/V*.sql)
+	// Boot 4는 자동설정이 모듈로 나뉘어 있어 spring-boot-flyway 를 함께 넣어야
+	// 기동 시 마이그레이션이 실행된다. flyway-core 만 넣으면 조용히 아무 일도 하지 않는다.
+	// Flyway 10부터는 DB별 모듈도 분리돼 postgresql 모듈이 별도로 필요하다.
+	implementation("org.springframework.boot:spring-boot-flyway")
+	runtimeOnly("org.flywaydb:flyway-database-postgresql")
 	implementation("org.springframework.boot:spring-boot-starter-data-redis")
 
 	// Security / OAuth2 (구글 소셜 로그인)

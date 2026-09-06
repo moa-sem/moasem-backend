@@ -130,29 +130,37 @@ RDS는 퍼블릭 액세스를 끈 상태로 둔다.
 **`SecurityConfig` 를 작성할 때 `/actuator/health` 를 `permitAll` 로 열어두면** 헬스 체크가 200을 받게 되고,
 그때 compose 의 healthcheck 를 `curl -f` 로 조여도 된다.
 
-## 4.1 알려진 제약: 스키마가 자동으로 만들어지지 않는다
+## 4.1 스키마 마이그레이션
 
-운영 프로파일은 `ddl-auto: validate` 다. 엔티티와 테이블이 맞는지 확인만 하고,
-없는 테이블을 만들어 주지는 않는다.
+스키마는 Flyway가 관리한다. `src/main/resources/db/migration` 의 SQL 파일을
+앱이 뜰 때 순서대로 적용하고, 적용 이력은 DB의 `flyway_schema_history` 테이블에 남는다.
 
-따라서 **비어 있는 RDS에 처음 배포하면 앱이 기동에 실패한다.**
+운영과 로컬 모두 `ddl-auto: validate` 라 Hibernate는 엔티티와 테이블이 맞는지 확인만 한다.
+테이블을 만들거나 바꾸는 것은 Flyway뿐이다.
+
+### 엔티티를 바꿀 때
+
+마이그레이션 SQL을 같은 PR에 포함한다.
 
 ```
-새 RDS(테이블 0개) → 앱 기동 → validate 실패 → 헬스 체크 3분 대기 → 배포 실패
+V1__init.sql          이미 적용됨. 수정하지 않는다
+V2__add_xxx.sql       새로 추가
 ```
 
-로컬(`ddl-auto: update`)에서는 Hibernate가 테이블을 만들어 주기 때문에 이 문제가 드러나지 않는다.
-운영에서 Hibernate가 스키마를 바꾸게 두면 위험하므로 `validate` 자체는 의도한 설정이고,
-**테이블을 누가 만들 것인가가 아직 정해지지 않았다.**
+**이미 적용된 파일은 고치지 않는다.** Flyway가 체크섬을 검증하므로 고치면 다음 기동에서
+실패한다. 잘못된 내용은 새 버전으로 바로잡는다.
 
-선택지는 둘이다.
+SQL을 빠뜨리면 로컬에서 바로 드러난다. 로컬도 `validate` 라 엔티티와 테이블이 어긋나면
+앱이 뜨지 않는다. 배포 후에 알게 되는 것보다 낫다.
 
-- **Flyway 도입** — `src/main/resources/db/migration` 에 SQL을 두면 기동 시 적용된다.
-  스키마가 버전 관리되고 팀원 로컬에도 같은 스키마가 깔린다.
-- **수동 생성** — RDS에 직접 붙어 `CREATE TABLE` 을 실행한다. 지금은 빠르지만
-  엔티티가 바뀔 때마다 사람이 맞춰야 하고, 놓치면 `validate` 가 배포를 막는다.
+### 로컬 스키마를 처음부터 다시 만들 때
 
-모든 도메인의 테이블이 걸려 있어 팀 논의가 필요하다. 정해지기 전까지 배포는 성공하지 않는다.
+```sql
+drop schema public cascade;
+create schema public;
+```
+
+앱을 다시 띄우면 Flyway가 처음부터 적용한다.
 
 ## 5. 수동 조작
 
