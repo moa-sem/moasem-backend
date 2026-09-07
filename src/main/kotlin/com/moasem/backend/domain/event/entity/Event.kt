@@ -61,6 +61,11 @@ class Event protected constructor(
     val isDeleted: Boolean
         get() = deletedAt != null
 
+    fun calculateTotalBudget(additionalBudget: Long): Long = initialBudget + additionalBudget
+
+    fun calculateRemainingBudget(additionalBudget: Long, approvedSpending: Long): Long =
+        calculateTotalBudget(additionalBudget) - approvedSpending
+
     fun delete(deletedAt: LocalDateTime = LocalDateTime.now()) {
         check(!isDeleted) { "이미 삭제된 행사입니다." }
         this.deletedAt = deletedAt
