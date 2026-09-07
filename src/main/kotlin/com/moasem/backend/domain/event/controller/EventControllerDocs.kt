@@ -2,6 +2,9 @@ package com.moasem.backend.domain.event.controller
 
 import com.moasem.backend.domain.event.dto.CreateBudgetAdditionRequest
 import com.moasem.backend.domain.event.dto.CreateEventRequest
+import com.moasem.backend.domain.event.dto.CloseEventRequest
+import com.moasem.backend.domain.event.dto.EventClosePreviewResponse
+import com.moasem.backend.domain.event.dto.EventCloseResponse
 import com.moasem.backend.domain.event.dto.EventDetailResponse
 import com.moasem.backend.domain.event.dto.EventListResponse
 import com.moasem.backend.domain.event.entity.EventStatus
@@ -69,4 +72,65 @@ interface EventControllerDocs {
         @Parameter(hidden = true) currentUserId: Long,
         request: CreateBudgetAdditionRequest,
     ): ResponseEntity<ApiResponse<Unit>>
+
+    @Operation(
+        summary = "행사 조건부 삭제",
+        description = "모임장이 지출 신청 이력이 없는 ACTIVE 행사를 논리 삭제한다.",
+    )
+    @ApiResponses(
+        SwaggerResponse(responseCode = "200", description = "삭제 성공"),
+        SwaggerResponse(responseCode = "403", description = "비구성원 또는 모임장이 아님 (NOT_GROUP_MEMBER, NOT_GROUP_OWNER)"),
+        SwaggerResponse(responseCode = "404", description = "활성 모임 또는 미삭제 행사 없음 (GROUP_NOT_FOUND, EVENT_NOT_FOUND)"),
+        SwaggerResponse(
+            responseCode = "409",
+            description = "마감된 행사 또는 지출 신청 이력 존재 (EVENT_ALREADY_CLOSED, EVENT_HAS_SPENDING_HISTORY)",
+        ),
+    )
+    fun deleteEvent(
+        @Parameter(description = "모임 ID", example = "1") groupId: Long,
+        @Parameter(description = "행사 ID", example = "10") eventId: Long,
+        @Parameter(hidden = true) currentUserId: Long,
+    ): ApiResponse<Unit>
+
+    @Operation(
+        summary = "행사 마감 미리보기",
+        description = "행사 상태를 변경하지 않고 마감 조건과 현재 예산 현황을 확인한다.",
+    )
+    @ApiResponses(
+        SwaggerResponse(responseCode = "200", description = "미리보기 조회 성공"),
+        SwaggerResponse(responseCode = "400", description = "참여 인원 입력값 오류 (INVALID_INPUT_VALUE)"),
+        SwaggerResponse(responseCode = "403", description = "비구성원 또는 모임장이 아님 (NOT_GROUP_MEMBER, NOT_GROUP_OWNER)"),
+        SwaggerResponse(responseCode = "404", description = "활성 모임 또는 미삭제 행사 없음 (GROUP_NOT_FOUND, EVENT_NOT_FOUND)"),
+        SwaggerResponse(
+            responseCode = "409",
+            description = "마감된 행사 또는 PENDING 지출 존재 (EVENT_ALREADY_CLOSED, EVENT_HAS_PENDING_SPENDING)",
+        ),
+    )
+    fun previewClose(
+        @Parameter(description = "모임 ID", example = "1") groupId: Long,
+        @Parameter(description = "행사 ID", example = "10") eventId: Long,
+        @Parameter(hidden = true) currentUserId: Long,
+        request: CloseEventRequest,
+    ): ApiResponse<EventClosePreviewResponse>
+
+    @Operation(
+        summary = "행사 마감 확정",
+        description = "마감 조건을 다시 검증하고 행사를 CLOSED 상태로 변경한 뒤 보고서 생성을 요청한다.",
+    )
+    @ApiResponses(
+        SwaggerResponse(responseCode = "200", description = "마감 성공"),
+        SwaggerResponse(responseCode = "400", description = "참여 인원 입력값 오류 (INVALID_INPUT_VALUE)"),
+        SwaggerResponse(responseCode = "403", description = "비구성원 또는 모임장이 아님 (NOT_GROUP_MEMBER, NOT_GROUP_OWNER)"),
+        SwaggerResponse(responseCode = "404", description = "활성 모임 또는 미삭제 행사 없음 (GROUP_NOT_FOUND, EVENT_NOT_FOUND)"),
+        SwaggerResponse(
+            responseCode = "409",
+            description = "마감된 행사 또는 PENDING 지출 존재 (EVENT_ALREADY_CLOSED, EVENT_HAS_PENDING_SPENDING)",
+        ),
+    )
+    fun closeEvent(
+        @Parameter(description = "모임 ID", example = "1") groupId: Long,
+        @Parameter(description = "행사 ID", example = "10") eventId: Long,
+        @Parameter(hidden = true) currentUserId: Long,
+        request: CloseEventRequest,
+    ): ApiResponse<EventCloseResponse>
 }
