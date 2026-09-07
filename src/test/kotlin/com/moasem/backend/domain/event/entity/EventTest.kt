@@ -8,6 +8,44 @@ import java.time.LocalDateTime
 class EventTest {
 
     @Test
+    fun `추가 예산이 없으면 총예산은 최초 예산과 같다`() {
+        assertThat(event().calculateTotalBudget(0L)).isEqualTo(500_000L)
+    }
+
+    @Test
+    fun `총예산은 최초 예산과 추가 예산의 합이다`() {
+        assertThat(event().calculateTotalBudget(150_000L)).isEqualTo(650_000L)
+    }
+
+    @Test
+    fun `잔여 예산은 총예산에서 승인 지출을 차감한다`() {
+        assertThat(event().calculateRemainingBudget(150_000L, 320_000L)).isEqualTo(330_000L)
+    }
+
+    @Test
+    fun `승인 지출이 총예산과 같으면 잔여 예산은 0원이다`() {
+        assertThat(event().calculateRemainingBudget(150_000L, 650_000L)).isZero()
+    }
+
+    @Test
+    fun `승인 지출이 총예산보다 크면 음수 잔여 예산을 유지한다`() {
+        assertThat(event().calculateRemainingBudget(0L, 550_000L)).isEqualTo(-50_000L)
+    }
+
+    @Test
+    fun `예산 계산은 행사 상태를 변경하지 않는다`() {
+        val event = event()
+
+        event.calculateTotalBudget(150_000L)
+        event.calculateRemainingBudget(150_000L, 320_000L)
+
+        assertThat(event.status).isEqualTo(EventStatus.ACTIVE)
+        assertThat(event.deletedAt).isNull()
+        assertThat(event.participantCount).isNull()
+        assertThat(event.closedAt).isNull()
+    }
+
+    @Test
     fun `ACTIVE 행사를 마감하면 상태 참여 인원 마감 시각을 기록한다`() {
         val event = event()
         val beforeClose = LocalDateTime.now()
