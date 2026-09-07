@@ -28,6 +28,9 @@ interface SpendingRepository : JpaRepository<Spending, Long> {
 
     fun findAllByEventIdAndStatus(eventId: Long, status: SpendingStatus, pageable: Pageable): Page<Spending>
 
+    /** 결산 보고서가 지출을 한 건씩 찍을 때 쓴다. 같은 날 지출이 여럿이면 등록순으로 고정한다. */
+    fun findAllByEventIdAndStatusOrderBySpentOnAscIdAsc(eventId: Long, status: SpendingStatus): List<Spending>
+
     fun countByEventIdAndStatus(eventId: Long, status: SpendingStatus): Long
 
     fun existsByEventId(eventId: Long): Boolean
