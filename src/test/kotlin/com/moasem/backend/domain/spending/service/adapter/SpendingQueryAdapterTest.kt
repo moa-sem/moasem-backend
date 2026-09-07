@@ -61,6 +61,74 @@ class SpendingQueryAdapterTest @Autowired constructor(
     }
 
     @Test
+    @DisplayName("승인된 지출만 목록에 들어간다")
+    fun approvedListContainsApprovedOnly() {
+        val approved = save(amount = 10_000L).also { it.approve(OWNER_ID) }
+        save(amount = 99_000L)
+        save(amount = 77_000L).also { it.reject(OWNER_ID, "증빙 누락") }
+        save(eventId = OTHER_EVENT_ID, amount = 50_000L).also { it.approve(OWNER_ID) }
+        spendingRepository.flush()
+
+        val details = adapter.getApprovedSpendings(EVENT_ID)
+
+        assertThat(details).hasSize(1)
+        assertThat(details.first().spendingId).isEqualTo(approved.id)
+        assertThat(details.first().amount).isEqualTo(10_000L)
+        assertThat(adapter.getApprovedSpendings(EMPTY_EVENT_ID)).isEmpty()
+    }
+
+    /** 보고서 표의 줄 순서가 매번 달라지면 같은 결산을 두 번 뽑았을 때 다르게 보인다. */
+    @Test
+    @DisplayName("목록은 지출일 오름차순으로, 같은 날이면 등록순으로 나온다")
+    fun approvedListIsOrdered() {
+        val second = save(spentOn = LocalDate.of(2026, 8, 20)).also { it.approve(OWNER_ID) }
+        val third = save(spentOn = LocalDate.of(2026, 8, 20)).also { it.approve(OWNER_ID) }
+        val first = save(spentOn = LocalDate.of(2026, 8, 18)).also { it.approve(OWNER_ID) }
+        spendingRepository.flush()
+
+        assertThat(adapter.getApprovedSpendings(EVENT_ID).map { it.spendingId })
+            .containsExactly(first.id, second.id, third.id)
+    }
+
+    @Test
+    @DisplayName("태그는 저장 코드와 한글 라벨을 함께 준다")
+    fun approvedListCarriesTagLabel() {
+        save(tag = SpendingTag.ACCOMMODATION).also { it.approve(OWNER_ID) }
+        spendingRepository.flush()
+
+        val detail = adapter.getApprovedSpendings(EVENT_ID).single()
+
+        assertThat(detail.tag).isEqualTo("ACCOMMODATION")
+        assertThat(detail.tagLabel).isEqualTo("숙박비")
+    }
+
+    @Test
+    @DisplayName("기타 태그는 상세 내용까지 함께 준다")
+    fun approvedListCarriesOtherDetail() {
+        save(tag = SpendingTag.OTHER, otherDetail = "구급약 구입").also { it.approve(OWNER_ID) }
+        spendingRepository.flush()
+
+        val detail = adapter.getApprovedSpendings(EVENT_ID).single()
+
+        assertThat(detail.tagLabel).isEqualTo("기타")
+        assertThat(detail.otherDetail).isEqualTo("구급약 구입")
+    }
+
+    /** 발급된 URL은 수 분 뒤 만료된다. 영구 보관되는 스냅샷에는 키가 남아야 한다(#92). */
+    @Test
+    @DisplayName("증빙은 URL이 아니라 저장소 키로 넘긴다")
+    fun approvedListCarriesEvidenceKey() {
+        val spending = save().also { it.approve(OWNER_ID) }
+        spendingRepository.flush()
+
+        val detail = adapter.getApprovedSpendings(EVENT_ID).single()
+
+        assertThat(detail.evidenceStorageKey).isEqualTo("spendings/$EVENT_ID/$APPLICANT_ID/evidence.jpg")
+        assertThat(detail.applicantUserId).isEqualTo(APPLICANT_ID)
+        assertThat(detail.description).isEqualTo(spending.reason)
+    }
+
+    @Test
     @DisplayName("PENDING 건수는 처리되지 않은 신청만 센다")
     fun pendingCountCountsPendingOnly() {
         save()
@@ -87,15 +155,18 @@ class SpendingQueryAdapterTest @Autowired constructor(
     private fun save(
         eventId: Long = EVENT_ID,
         amount: Long = 15_000L,
+        spentOn: LocalDate = LocalDate.of(2026, 8, 20),
+        tag: SpendingTag = SpendingTag.MEAL,
+        otherDetail: String? = null,
     ): Spending = spendingRepository.save(
         Spending.create(
             eventId = eventId,
             applicantUserId = APPLICANT_ID,
             amount = amount,
-            spentOn = LocalDate.of(2026, 8, 20),
+            spentOn = spentOn,
             reason = "1일차 점심 식사",
-            tag = SpendingTag.MEAL,
-            otherDetail = null,
+            tag = tag,
+            otherDetail = otherDetail,
             evidence = Spending.Evidence(
                 EvidenceType.RECEIPT,
                 "spendings/$eventId/$APPLICANT_ID/evidence.jpg",

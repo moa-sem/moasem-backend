@@ -1,6 +1,7 @@
 package com.moasem.backend.domain.spending.service.adapter
 
 import com.moasem.backend.domain.event.service.adapter.EventAccessAdapter
+import com.moasem.backend.domain.event.service.port.ApprovedSpendingListProvider
 import com.moasem.backend.domain.event.service.port.ApprovedSpendingTotalProvider
 import com.moasem.backend.domain.event.service.port.PendingSpendingCountProvider
 import com.moasem.backend.domain.event.service.port.SpendingHistoryProvider
@@ -26,6 +27,7 @@ import org.springframework.test.context.ActiveProfiles
 @ActiveProfiles("test")
 class SpendingPortWiringTest @Autowired constructor(
     private val approvedSpendingTotalProvider: ApprovedSpendingTotalProvider,
+    private val approvedSpendingListProvider: ApprovedSpendingListProvider,
     private val pendingSpendingCountProvider: PendingSpendingCountProvider,
     private val spendingHistoryProvider: SpendingHistoryProvider,
     private val eventAccessProvider: EventAccessProvider,
@@ -37,6 +39,7 @@ class SpendingPortWiringTest @Autowired constructor(
         assertThat(approvedSpendingTotalProvider).isInstanceOf(SpendingQueryAdapter::class.java)
         assertThat(pendingSpendingCountProvider).isInstanceOf(SpendingQueryAdapter::class.java)
         assertThat(spendingHistoryProvider).isInstanceOf(SpendingQueryAdapter::class.java)
+        assertThat(approvedSpendingListProvider).isInstanceOf(SpendingQueryAdapter::class.java)
     }
 
     @Test
