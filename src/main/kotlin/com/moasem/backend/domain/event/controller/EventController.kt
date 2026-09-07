@@ -2,16 +2,23 @@ package com.moasem.backend.domain.event.controller
 
 import com.moasem.backend.domain.event.dto.CreateBudgetAdditionRequest
 import com.moasem.backend.domain.event.dto.CreateEventRequest
+import com.moasem.backend.domain.event.dto.CloseEventRequest
+import com.moasem.backend.domain.event.dto.EventClosePreviewResponse
+import com.moasem.backend.domain.event.dto.EventCloseResponse
 import com.moasem.backend.domain.event.dto.EventDetailResponse
 import com.moasem.backend.domain.event.dto.EventListResponse
 import com.moasem.backend.domain.event.entity.EventStatus
 import com.moasem.backend.domain.event.service.BudgetAdditionService
+import com.moasem.backend.domain.event.service.EventClosePreviewService
+import com.moasem.backend.domain.event.service.EventCloseService
+import com.moasem.backend.domain.event.service.EventDeletionService
 import com.moasem.backend.domain.event.service.EventService
 import com.moasem.backend.global.response.ApiResponse
 import jakarta.validation.Valid
 import org.springframework.http.HttpStatus
 import org.springframework.http.ResponseEntity
 import org.springframework.security.core.annotation.AuthenticationPrincipal
+import org.springframework.web.bind.annotation.DeleteMapping
 import org.springframework.web.bind.annotation.GetMapping
 import org.springframework.web.bind.annotation.PathVariable
 import org.springframework.web.bind.annotation.PostMapping
@@ -27,6 +34,9 @@ import java.net.URI
 class EventController(
     private val eventService: EventService,
     private val budgetAdditionService: BudgetAdditionService,
+    private val eventDeletionService: EventDeletionService,
+    private val eventClosePreviewService: EventClosePreviewService,
+    private val eventCloseService: EventCloseService,
 ) : EventControllerDocs {
 
     @PostMapping
@@ -67,4 +77,35 @@ class EventController(
         budgetAdditionService.addBudgetAddition(groupId, eventId, currentUserId, request)
         return ResponseEntity.status(HttpStatus.CREATED).body(ApiResponse.ok())
     }
+
+    @DeleteMapping("/{eventId}")
+    override fun deleteEvent(
+        @PathVariable groupId: Long,
+        @PathVariable eventId: Long,
+        @AuthenticationPrincipal currentUserId: Long,
+    ): ApiResponse<Unit> {
+        eventDeletionService.deleteEvent(groupId, eventId, currentUserId)
+        return ApiResponse.ok()
+    }
+
+    @PostMapping("/{eventId}/close-preview")
+    override fun previewClose(
+        @PathVariable groupId: Long,
+        @PathVariable eventId: Long,
+        @AuthenticationPrincipal currentUserId: Long,
+        @Valid @RequestBody request: CloseEventRequest,
+    ): ApiResponse<EventClosePreviewResponse> = ApiResponse.success(
+        eventClosePreviewService.previewClose(groupId, eventId, currentUserId, request.participantCount),
+    )
+
+    @PostMapping("/{eventId}/close")
+    override fun closeEvent(
+        @PathVariable groupId: Long,
+        @PathVariable eventId: Long,
+        @AuthenticationPrincipal currentUserId: Long,
+        @Valid @RequestBody request: CloseEventRequest,
+    ): ApiResponse<EventCloseResponse> = ApiResponse.success(
+        "행사를 마감했습니다.",
+        eventCloseService.closeEvent(groupId, eventId, currentUserId, request.participantCount),
+    )
 }

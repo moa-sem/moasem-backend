@@ -2,10 +2,16 @@ package com.moasem.backend.domain.event.controller
 
 import com.moasem.backend.domain.event.dto.CreateBudgetAdditionRequest
 import com.moasem.backend.domain.event.dto.CreateEventRequest
+import com.moasem.backend.domain.event.dto.CloseEventRequest
+import com.moasem.backend.domain.event.dto.EventClosePreviewResponse
+import com.moasem.backend.domain.event.dto.EventCloseResponse
 import com.moasem.backend.domain.event.dto.EventDetailResponse
 import com.moasem.backend.domain.event.dto.EventListResponse
 import com.moasem.backend.domain.event.entity.EventStatus
 import com.moasem.backend.domain.event.service.BudgetAdditionService
+import com.moasem.backend.domain.event.service.EventClosePreviewService
+import com.moasem.backend.domain.event.service.EventCloseService
+import com.moasem.backend.domain.event.service.EventDeletionService
 import com.moasem.backend.domain.event.service.EventService
 import com.moasem.backend.global.error.BusinessException
 import com.moasem.backend.global.error.ErrorCode
@@ -26,6 +32,7 @@ import org.springframework.security.authentication.UsernamePasswordAuthenticatio
 import org.springframework.test.context.ActiveProfiles
 import org.springframework.test.web.servlet.MockMvc
 import org.springframework.test.web.servlet.request.RequestPostProcessor
+import org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete
 import org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get
 import org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post
 import org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.authentication
@@ -55,6 +62,15 @@ class EventControllerTest {
 
     @MockkBean
     private lateinit var budgetAdditionService: BudgetAdditionService
+
+    @MockkBean
+    private lateinit var eventDeletionService: EventDeletionService
+
+    @MockkBean
+    private lateinit var eventClosePreviewService: EventClosePreviewService
+
+    @MockkBean
+    private lateinit var eventCloseService: EventCloseService
 
     @Test
     @DisplayName("행사를 생성하면 인증 사용자 ID를 전달하고 201과 Location을 반환한다")
@@ -269,6 +285,179 @@ class EventControllerTest {
             .andExpect(jsonPath("$.code").value("EVENT_ALREADY_CLOSED"))
     }
 
+    @Test
+    @DisplayName("행사 삭제는 인증 사용자 ID를 전달하고 공통 성공 응답을 반환한다")
+    fun deleteEvent() {
+        every { eventDeletionService.deleteEvent(GROUP_ID, EVENT_ID, USER_ID) } returns Unit
+
+        performDelete()
+            .andExpect(status().isOk)
+            .andExpect(jsonPath("$.success").value(true))
+            .andExpect(jsonPath("$.data").doesNotExist())
+
+        verify(exactly = 1) { eventDeletionService.deleteEvent(GROUP_ID, EVENT_ID, USER_ID) }
+    }
+
+    @Test
+    @DisplayName("존재하지 않거나 삭제된 행사 삭제는 404를 반환한다")
+    fun deleteMissingEvent() {
+        every { eventDeletionService.deleteEvent(GROUP_ID, EVENT_ID, USER_ID) } throws
+            BusinessException(ErrorCode.EVENT_NOT_FOUND)
+
+        performDelete()
+            .andExpect(status().isNotFound)
+            .andExpect(jsonPath("$.code").value("EVENT_NOT_FOUND"))
+    }
+
+    @Test
+    @DisplayName("일반회원의 행사 삭제는 403을 반환한다")
+    fun deleteEventByMember() {
+        every { eventDeletionService.deleteEvent(GROUP_ID, EVENT_ID, USER_ID) } throws
+            BusinessException(ErrorCode.NOT_GROUP_OWNER)
+
+        performDelete()
+            .andExpect(status().isForbidden)
+            .andExpect(jsonPath("$.code").value("NOT_GROUP_OWNER"))
+    }
+
+    @Test
+    @DisplayName("지출 신청 이력이 있는 행사 삭제는 409를 반환한다")
+    fun deleteEventWithSpendingHistory() {
+        every { eventDeletionService.deleteEvent(GROUP_ID, EVENT_ID, USER_ID) } throws
+            BusinessException(ErrorCode.EVENT_HAS_SPENDING_HISTORY)
+
+        performDelete()
+            .andExpect(status().isConflict)
+            .andExpect(jsonPath("$.code").value("EVENT_HAS_SPENDING_HISTORY"))
+    }
+
+    @Test
+    @DisplayName("마감 미리보기는 참여 인원과 인증 사용자 ID를 전달하고 예산 현황을 반환한다")
+    fun previewClose() {
+        every {
+            eventClosePreviewService.previewClose(GROUP_ID, EVENT_ID, USER_ID, PARTICIPANT_COUNT)
+        } returns closePreviewResponse()
+
+        performClosePreview()
+            .andExpect(status().isOk)
+            .andExpect(jsonPath("$.data.participantCount").value(PARTICIPANT_COUNT))
+            .andExpect(jsonPath("$.data.initialBudget").value(500000))
+            .andExpect(jsonPath("$.data.additionalBudget").value(100000))
+            .andExpect(jsonPath("$.data.totalBudget").value(600000))
+            .andExpect(jsonPath("$.data.approvedSpending").value(250000))
+            .andExpect(jsonPath("$.data.remainingBudget").value(350000))
+
+        verify(exactly = 1) {
+            eventClosePreviewService.previewClose(GROUP_ID, EVENT_ID, USER_ID, PARTICIPANT_COUNT)
+        }
+        verify(exactly = 0) { eventCloseService.closeEvent(any(), any(), any(), any()) }
+        verify(exactly = 0) { eventDeletionService.deleteEvent(any(), any(), any()) }
+    }
+
+    @Test
+    @DisplayName("마감 미리보기 참여 인원이 0명이면 400이고 서비스를 호출하지 않는다")
+    fun previewCloseWithZeroParticipants() {
+        performClosePreview(participantCount = 0)
+            .andExpect(status().isBadRequest)
+            .andExpect(jsonPath("$.code").value("INVALID_INPUT_VALUE"))
+            .andExpect(jsonPath("$.errors[0].field").value("participantCount"))
+
+        verify(exactly = 0) { eventClosePreviewService.previewClose(any(), any(), any(), any()) }
+    }
+
+    @Test
+    @DisplayName("마감 미리보기 참여 인원이 음수이면 400이다")
+    fun previewCloseWithNegativeParticipants() {
+        performClosePreview(participantCount = -1)
+            .andExpect(status().isBadRequest)
+            .andExpect(jsonPath("$.code").value("INVALID_INPUT_VALUE"))
+    }
+
+    @Test
+    @DisplayName("PENDING 지출이 있으면 마감 미리보기는 409를 반환한다")
+    fun previewCloseWithPendingSpending() {
+        every {
+            eventClosePreviewService.previewClose(GROUP_ID, EVENT_ID, USER_ID, PARTICIPANT_COUNT)
+        } throws BusinessException(ErrorCode.EVENT_HAS_PENDING_SPENDING)
+
+        performClosePreview()
+            .andExpect(status().isConflict)
+            .andExpect(jsonPath("$.code").value("EVENT_HAS_PENDING_SPENDING"))
+    }
+
+    @Test
+    @DisplayName("이미 마감된 행사의 마감 미리보기는 409를 반환한다")
+    fun previewAlreadyClosedEvent() {
+        every {
+            eventClosePreviewService.previewClose(GROUP_ID, EVENT_ID, USER_ID, PARTICIPANT_COUNT)
+        } throws BusinessException(ErrorCode.EVENT_ALREADY_CLOSED)
+
+        performClosePreview()
+            .andExpect(status().isConflict)
+            .andExpect(jsonPath("$.code").value("EVENT_ALREADY_CLOSED"))
+    }
+
+    @Test
+    @DisplayName("행사 마감은 참여 인원과 인증 사용자 ID를 전달하고 확정 결과를 반환한다")
+    fun closeEvent() {
+        every {
+            eventCloseService.closeEvent(GROUP_ID, EVENT_ID, USER_ID, PARTICIPANT_COUNT)
+        } returns closeResponse()
+
+        performClose()
+            .andExpect(status().isOk)
+            .andExpect(jsonPath("$.success").value(true))
+            .andExpect(jsonPath("$.data.status").value("CLOSED"))
+            .andExpect(jsonPath("$.data.participantCount").value(PARTICIPANT_COUNT))
+            .andExpect(jsonPath("$.data.closedAt").value("2026-09-12T13:00:00"))
+
+        verify(exactly = 1) {
+            eventCloseService.closeEvent(GROUP_ID, EVENT_ID, USER_ID, PARTICIPANT_COUNT)
+        }
+    }
+
+    @Test
+    @DisplayName("행사 마감 참여 인원이 0명이면 400이고 서비스를 호출하지 않는다")
+    fun closeEventWithZeroParticipants() {
+        performClose(participantCount = 0)
+            .andExpect(status().isBadRequest)
+            .andExpect(jsonPath("$.code").value("INVALID_INPUT_VALUE"))
+
+        verify(exactly = 0) { eventCloseService.closeEvent(any(), any(), any(), any()) }
+    }
+
+    @Test
+    @DisplayName("행사 마감 참여 인원이 음수이면 400이다")
+    fun closeEventWithNegativeParticipants() {
+        performClose(participantCount = -1)
+            .andExpect(status().isBadRequest)
+            .andExpect(jsonPath("$.errors[0].field").value("participantCount"))
+    }
+
+    @Test
+    @DisplayName("PENDING 지출이 있으면 행사 마감은 409를 반환한다")
+    fun closeEventWithPendingSpending() {
+        every {
+            eventCloseService.closeEvent(GROUP_ID, EVENT_ID, USER_ID, PARTICIPANT_COUNT)
+        } throws BusinessException(ErrorCode.EVENT_HAS_PENDING_SPENDING)
+
+        performClose()
+            .andExpect(status().isConflict)
+            .andExpect(jsonPath("$.code").value("EVENT_HAS_PENDING_SPENDING"))
+    }
+
+    @Test
+    @DisplayName("이미 마감된 행사의 마감 확정은 409를 반환한다")
+    fun closeAlreadyClosedEvent() {
+        every {
+            eventCloseService.closeEvent(GROUP_ID, EVENT_ID, USER_ID, PARTICIPANT_COUNT)
+        } throws BusinessException(ErrorCode.EVENT_ALREADY_CLOSED)
+
+        performClose()
+            .andExpect(status().isConflict)
+            .andExpect(jsonPath("$.code").value("EVENT_ALREADY_CLOSED"))
+    }
+
     private fun performCreate() = mockMvc.perform(
         post(BASE_URL)
             .with(authenticatedUser())
@@ -281,6 +470,24 @@ class EventControllerTest {
             .with(authenticatedUser())
             .contentType(MediaType.APPLICATION_JSON)
             .content(objectMapper.writeValueAsString(request)),
+    )
+
+    private fun performDelete() = mockMvc.perform(
+        delete("$BASE_URL/$EVENT_ID").with(authenticatedUser()),
+    )
+
+    private fun performClosePreview(participantCount: Int = PARTICIPANT_COUNT) = mockMvc.perform(
+        post("$BASE_URL/$EVENT_ID/close-preview")
+            .with(authenticatedUser())
+            .contentType(MediaType.APPLICATION_JSON)
+            .content(objectMapper.writeValueAsString(CloseEventRequest(participantCount))),
+    )
+
+    private fun performClose(participantCount: Int = PARTICIPANT_COUNT) = mockMvc.perform(
+        post("$BASE_URL/$EVENT_ID/close")
+            .with(authenticatedUser())
+            .contentType(MediaType.APPLICATION_JSON)
+            .content(objectMapper.writeValueAsString(CloseEventRequest(participantCount))),
     )
 
     private fun createRequest(title: String = "여름 MT") = CreateEventRequest(
@@ -322,10 +529,31 @@ class EventControllerTest {
         remainingBudget = 350_000L,
     )
 
+    private fun closePreviewResponse() = EventClosePreviewResponse(
+        eventId = EVENT_ID,
+        title = "여름 MT",
+        status = EventStatus.ACTIVE,
+        participantCount = PARTICIPANT_COUNT,
+        pendingSpendingCount = 0L,
+        initialBudget = 500_000L,
+        additionalBudget = 100_000L,
+        totalBudget = 600_000L,
+        approvedSpending = 250_000L,
+        remainingBudget = 350_000L,
+    )
+
+    private fun closeResponse() = EventCloseResponse(
+        eventId = EVENT_ID,
+        status = EventStatus.CLOSED,
+        participantCount = PARTICIPANT_COUNT,
+        closedAt = LocalDateTime.of(2026, 9, 12, 13, 0),
+    )
+
     companion object {
         private const val GROUP_ID = 1L
         private const val EVENT_ID = 10L
         private const val USER_ID = 42L
+        private const val PARTICIPANT_COUNT = 12
         private const val BASE_URL = "/api/v1/groups/$GROUP_ID/events"
         private val START_AT = LocalDateTime.of(2026, 9, 10, 10, 0)
         private val END_AT = LocalDateTime.of(2026, 9, 12, 12, 0)
