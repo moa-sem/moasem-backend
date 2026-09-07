@@ -5,6 +5,7 @@ import com.moasem.backend.domain.report.entity.AiAnalysisStatus
 import com.moasem.backend.domain.report.entity.Report
 import com.moasem.backend.domain.report.entity.ReportStatus
 import com.moasem.backend.domain.report.repository.ReportRepository
+import com.moasem.backend.domain.report.service.port.ApprovedSpendingData
 import com.moasem.backend.domain.report.service.port.GroupMembershipProvider
 import com.moasem.backend.domain.report.service.port.FakeEventSnapshotProvider.Companion.sampleData
 import com.moasem.backend.domain.report.service.port.FakeEventSnapshotProvider.Companion.sampleSpending
@@ -37,12 +38,13 @@ class ReportQueryServiceTest {
     private fun completedReport(
         eventId: Long = EVENT_ID,
         aiSummary: String? = "예산의 64%를 사용했습니다.",
+        approvedSpendings: List<ApprovedSpendingData> = listOf(sampleSpending(amount = 320_000L)),
     ): Report {
         val snapshot = ReportSnapshotCalculator().calculate(
             sampleData(
                 eventId = eventId,
                 initialBudget = 500_000L,
-                approvedSpendings = listOf(sampleSpending(amount = 320_000L)),
+                approvedSpendings = approvedSpendings,
             ),
         )
         return Report.create(eventId).apply {
@@ -56,6 +58,28 @@ class ReportQueryServiceTest {
     @Nested
     @DisplayName("보고서 조회")
     inner class GetReport {
+
+        /**
+         * 저장소 키는 내부 구조라 밖으로 내보내지 않는다. 클라이언트가 키로 할 수 있는 일이 없고,
+         * 증빙이 필요하면 spending이 이미 제공하는 경로를 쓴다. 응답에는 버튼 노출 판단에 필요한
+         * 존재 여부만 있으면 된다(#92).
+         */
+        @Test
+        fun `증빙은 저장소 키 대신 존재 여부만 응답한다`() {
+            every { reportRepository.findByEventId(EVENT_ID) } returns completedReport(
+                approvedSpendings = listOf(
+                    sampleSpending(spendingId = 1L, receiptKey = "spendings/1/evidence.jpg"),
+                    sampleSpending(spendingId = 2L, receiptKey = null),
+                ),
+            )
+
+            val response = service.getReport(EVENT_ID, USER_ID)
+
+            assertThat(response.spendings.map { it.spendingId to it.hasReceipt })
+                .containsExactly(1L to true, 2L to false)
+            // 필드 이름이 바뀌어도 키가 새어 나가면 잡히도록 응답 전체를 확인한다.
+            assertThat(response.spendings.toString()).doesNotContain("evidence.jpg")
+        }
 
         @Test
         fun `스냅샷 내용이 그대로 반환된다`() {

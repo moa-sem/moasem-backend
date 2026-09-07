@@ -67,5 +67,11 @@ data class ApprovedSpendingData(
     val tagLabel: String,
     val payerName: String,
     val spentAt: LocalDateTime,
-    val receiptUrl: String?,
+    /**
+     * 증빙 파일의 저장소 키. 증빙이 없으면 null.
+     *
+     * URL이 아니라 키를 받는다. 발급된 다운로드 URL은 수 분 뒤 만료되는데 스냅샷은 불변으로
+     * 영구 보관되므로, URL을 넣으면 죽은 링크가 보고서에 박힌 채 남는다.
+     */
+    val receiptKey: String?,
 )

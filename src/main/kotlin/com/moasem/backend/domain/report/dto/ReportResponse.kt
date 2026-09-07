@@ -126,5 +126,12 @@ data class SpendingLineResponse(
 
     val payerName: String,
     val spentAt: LocalDateTime,
-    val receiptUrl: String?,
+
+    @field:Schema(
+        description = "증빙 첨부 여부. 실제 이미지는 " +
+            "`GET /api/v1/events/{eventId}/spendings/{spendingId}/evidence` 로 조회한다. " +
+            "저장소 키는 내부 구조라 내려주지 않는다.",
+        example = "true",
+    )
+    val hasReceipt: Boolean,
 )

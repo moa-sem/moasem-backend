@@ -56,6 +56,12 @@ data class ReportSnapshot(
         val tag: String,
         val payerName: String,
         val spentAt: LocalDateTime,
-        val receiptUrl: String?,
+        /**
+         * 결산 시점에 붙어 있던 증빙의 저장소 키. 응답으로 내보내지 않는다.
+         *
+         * 저장소 구조는 내부 사정이라 밖으로 드러낼 이유가 없다. 그래도 스냅샷에는 남긴다.
+         * 나중에 원본 지출이 바뀌어도 "결산할 때 이 증빙이 있었다"는 사실은 바뀌지 않아야 한다.
+         */
+        val receiptKey: String?,
     )
 }
