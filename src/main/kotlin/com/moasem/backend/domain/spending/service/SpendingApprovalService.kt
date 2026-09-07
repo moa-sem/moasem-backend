@@ -1,6 +1,5 @@
 package com.moasem.backend.domain.spending.service
 
-import com.moasem.backend.domain.spending.converter.SpendingConverter
 import com.moasem.backend.domain.spending.dto.RejectSpendingRequest
 import com.moasem.backend.domain.spending.dto.SpendingDetailResponse
 import com.moasem.backend.domain.spending.entity.Spending
@@ -38,7 +37,7 @@ class SpendingApprovalService(
         val spending = findForProcessing(eventId, spendingId)
         spending.approve(currentUserId)
 
-        return SpendingConverter.toDetailResponse(spending)
+        return SpendingDetailResponse.from(spending)
     }
 
     /** 지출을 반려한다. 사유는 필수이며 비어 있으면 엔티티가 거부한다. */
@@ -54,7 +53,7 @@ class SpendingApprovalService(
         val spending = findForProcessing(eventId, spendingId)
         spending.reject(currentUserId, request.reason)
 
-        return SpendingConverter.toDetailResponse(spending)
+        return SpendingDetailResponse.from(spending)
     }
 
     private fun validateOwner(eventId: Long, userId: Long) {
