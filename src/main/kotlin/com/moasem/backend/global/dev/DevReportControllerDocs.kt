@@ -1,9 +1,7 @@
 package com.moasem.backend.global.dev
 
-import com.moasem.backend.global.response.ApiResponse
 import jakarta.servlet.http.HttpServletRequest
 import io.swagger.v3.oas.annotations.Operation
-import io.swagger.v3.oas.annotations.Parameter
 import io.swagger.v3.oas.annotations.responses.ApiResponses
 import io.swagger.v3.oas.annotations.tags.Tag
 import org.springframework.http.ResponseEntity
@@ -14,30 +12,8 @@ import io.swagger.v3.oas.annotations.responses.ApiResponse as SwaggerResponse
  *
  * 운영에는 올라가지 않는다. 로컬 프로파일에서만 등록된다.
  */
-@Tag(name = "Dev (로컬 전용)", description = "로컬에서 보고서 흐름을 확인하기 위한 임시 API")
+@Tag(name = "Dev (로컬 전용)", description = "로컬 저장소에 저장된 보고서 파일을 내려주는 임시 API")
 interface DevReportControllerDocs {
-
-    @Operation(
-        summary = "샘플 보고서 생성",
-        description = """
-            샘플 결산 원자료를 등록하고 보고서를 실제로 생성한다.
-
-            행사 마감으로 보고서를 만드는 실제 경로는 event 컨트롤러가 없어 아직 호출할 수 없다.
-            그동안 조회·다운로드 API를 확인하려면 보고서가 하나 있어야 해서 둔다.
-
-            생성 과정은 실제와 같다. 스냅샷 계산, AI 분석, PDF·CSV 생성, 저장까지 모두 거친다.
-            원자료만 샘플이다.
-
-            같은 행사로 다시 호출하면 기존 보고서를 지우고 새로 만든다. 반복해서 눌러도 된다.
-        """,
-    )
-    @ApiResponses(
-        SwaggerResponse(responseCode = "200", description = "생성 성공"),
-        SwaggerResponse(responseCode = "409", description = "마감되지 않은 행사 (EVENT_NOT_CLOSED)"),
-    )
-    fun seedReport(
-        @Parameter(description = "샘플을 만들 행사 ID. 아무 값이나 써도 된다", example = "1") eventId: Long,
-    ): ApiResponse<DevReportSeedResponse>
 
     @Operation(
         summary = "로컬 저장소 파일 다운로드",
