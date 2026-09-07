@@ -1,6 +1,5 @@
 package com.moasem.backend.domain.event.service
 
-import com.moasem.backend.domain.event.converter.EventConverter
 import com.moasem.backend.domain.event.dto.CreateEventRequest
 import com.moasem.backend.domain.event.dto.EventDetailResponse
 import com.moasem.backend.domain.event.dto.EventListResponse
@@ -36,7 +35,7 @@ class EventService(
             initialBudget = request.initialBudget,
         )
 
-        return EventConverter.toDetailResponse(
+        return EventDetailResponse.from(
             event = eventRepository.save(event),
             additionalBudget = 0L,
             approvedSpending = 0L,
@@ -51,7 +50,7 @@ class EventService(
         } else {
             eventRepository.findAllByGroupIdAndStatusAndDeletedAtIsNullOrderByStartAtDesc(groupId, status)
         }
-        return events.map(EventConverter::toListResponse)
+        return events.map(EventListResponse::from)
     }
 
     @Transactional(readOnly = true)
@@ -62,7 +61,7 @@ class EventService(
         val persistedEventId = event.id ?: error("저장되지 않은 행사는 조회할 수 없습니다.")
         val additionalBudget = budgetAdditionRepository.sumAmountByEventId(persistedEventId)
         val approvedSpending = approvedSpendingTotalProvider.getApprovedSpendingTotal(persistedEventId)
-        return EventConverter.toDetailResponse(event, additionalBudget, approvedSpending)
+        return EventDetailResponse.from(event, additionalBudget, approvedSpending)
     }
 
     private fun validateGroupOwner(groupId: Long, userId: Long) {
