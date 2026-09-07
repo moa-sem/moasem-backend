@@ -72,7 +72,7 @@ class ReportConverter {
                     label = labels[it.tag] ?: it.tag,
                     payerName = it.payerName,
                     spentAt = it.spentAt,
-                    receiptUrl = it.receiptUrl,
+                    hasReceipt = it.receiptKey != null,
                 )
             },
             generatedAt = report.generatedAt,

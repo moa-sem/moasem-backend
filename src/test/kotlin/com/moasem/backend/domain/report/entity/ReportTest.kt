@@ -193,7 +193,7 @@ class ReportTest {
                         tag = "MEAL",
                         payerName = "김석주",
                         spentAt = now.plusDays(1),
-                        receiptUrl = null,
+                        receiptKey = null,
                     ),
                 ),
             )

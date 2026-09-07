@@ -51,7 +51,7 @@ class FakeEventSnapshotProvider : EventSnapshotProvider {
             tagLabel: String = "식비",
             payerName: String = "김석주",
             spentAt: LocalDateTime = BASE_TIME.plusDays(1),
-            receiptUrl: String? = null,
+            receiptKey: String? = null,
         ): ApprovedSpendingData = ApprovedSpendingData(
             spendingId = spendingId,
             description = description,
@@ -60,7 +60,7 @@ class FakeEventSnapshotProvider : EventSnapshotProvider {
             tagLabel = tagLabel,
             payerName = payerName,
             spentAt = spentAt,
-            receiptUrl = receiptUrl,
+            receiptKey = receiptKey,
         )
 
         fun sampleAddition(

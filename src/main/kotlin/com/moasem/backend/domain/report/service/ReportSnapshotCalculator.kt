@@ -64,7 +64,7 @@ class ReportSnapshotCalculator {
                         tag = it.tag,
                         payerName = it.payerName,
                         spentAt = it.spentAt,
-                        receiptUrl = it.receiptUrl,
+                        receiptKey = it.receiptKey,
                     )
                 },
         )

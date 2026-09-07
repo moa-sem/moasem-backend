@@ -83,7 +83,7 @@ class DevEventSnapshotStore : EventSnapshotProvider {
         tagLabel = tagLabel,
         payerName = payerName,
         spentAt = spentAt,
-        receiptUrl = null,
+        receiptKey = null,
     )
 
     companion object {
