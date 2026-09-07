@@ -7,7 +7,6 @@ import com.moasem.backend.domain.event.service.port.SpendingHistoryProvider
 import com.moasem.backend.domain.report.service.port.AiAnalysisInput
 import com.moasem.backend.domain.report.service.port.EventSnapshotData
 import com.moasem.backend.domain.report.service.port.EventSnapshotProvider
-import com.moasem.backend.domain.report.service.port.GroupMembershipProvider
 import com.moasem.backend.domain.report.service.port.ReportAiClient
 import com.moasem.backend.domain.spending.service.port.GroupAccessProvider as SpendingGroupAccessProvider
 import org.springframework.boot.autoconfigure.condition.ConditionalOnMissingBean
@@ -18,7 +17,7 @@ import org.springframework.context.annotation.Profile
 /**
  * 아직 구현체가 없는 port를 로컬에서만 임시로 채운다.
  *
- * group·spending·auth 도메인이 미완성이라 해당 port의 어댑터가 없고, 그 결과 애플리케이션이
+ * spending·auth 도메인이 미완성이라 해당 port의 어댑터가 없고, 그 결과 애플리케이션이
  * 빈 주입 단계에서 기동조차 되지 않는다. 각 도메인이 컨트롤러를 검증하거나 Swagger를 확인할
  * 방법이 없어 임시로 둔다.
  *
@@ -50,12 +49,6 @@ class LocalPortStubs {
     fun stubSpendingGroupAccessProvider() = object : SpendingGroupAccessProvider {
         override fun isMember(groupId: Long, userId: Long) = true
         override fun isOwner(groupId: Long, userId: Long) = true
-    }
-
-    @Bean
-    @ConditionalOnMissingBean(GroupMembershipProvider::class)
-    fun stubGroupMembershipProvider() = object : GroupMembershipProvider {
-        override fun isMember(groupId: Long, userId: Long) = true
     }
 
     @Bean
