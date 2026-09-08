@@ -14,9 +14,13 @@ import com.moasem.backend.domain.report.service.ReportRetryService
 import com.moasem.backend.global.error.BusinessException
 import com.moasem.backend.global.error.ErrorCode
 import com.moasem.backend.global.error.GlobalExceptionHandler
-import com.moasem.backend.global.security.JwtAuthenticationFilter
+import com.moasem.backend.global.security.JwtProvider
+import com.moasem.backend.global.security.SecurityConfig
+import com.moasem.backend.global.security.SecurityExceptionHandler
 import com.ninjasquad.springmockk.MockkBean
 import io.mockk.every
+import io.mockk.verify
+import org.assertj.core.api.Assertions.assertThat
 import org.junit.jupiter.api.DisplayName
 import org.junit.jupiter.api.Test
 import org.springframework.beans.factory.annotation.Autowired
@@ -25,6 +29,9 @@ import org.springframework.boot.webmvc.test.autoconfigure.WebMvcTest
 import org.springframework.context.annotation.Import
 import org.springframework.test.context.ActiveProfiles
 import org.springframework.test.web.servlet.MockMvc
+import org.springframework.security.authentication.UsernamePasswordAuthenticationToken
+import org.springframework.security.core.Authentication
+import org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.authentication
 import org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get
 import org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post
 import org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath
@@ -32,8 +39,8 @@ import org.springframework.test.web.servlet.result.MockMvcResultMatchers.status
 import java.time.LocalDateTime
 
 @WebMvcTest(controllers = [ReportController::class])
-@Import(GlobalExceptionHandler::class)
-@AutoConfigureMockMvc(addFilters = false)
+@Import(GlobalExceptionHandler::class, SecurityConfig::class, SecurityExceptionHandler::class)
+@AutoConfigureMockMvc
 @ActiveProfiles("test")
 class ReportControllerTest {
 
@@ -41,7 +48,7 @@ class ReportControllerTest {
     private lateinit var mockMvc: MockMvc
 
     @MockkBean
-    private lateinit var jwtAuthenticationFilter: JwtAuthenticationFilter
+    private lateinit var jwtProvider: JwtProvider
 
     @MockkBean
     private lateinit var reportQueryService: ReportQueryService
@@ -57,7 +64,7 @@ class ReportControllerTest {
     fun getReport() {
         every { reportQueryService.getReport(EVENT_ID, USER_ID) } returns detailResponse()
 
-        mockMvc.perform(get("/api/v1/events/$EVENT_ID/report").header("X-User-Id", USER_ID))
+        mockMvc.perform(get("/api/v1/events/$EVENT_ID/report").with(authentication(principalOf(USER_ID))))
             .andExpect(status().isOk)
             .andExpect(jsonPath("$.success").value(true))
             .andExpect(jsonPath("$.data.event.title").value("여름 MT"))
@@ -71,7 +78,7 @@ class ReportControllerTest {
         every { reportQueryService.getReport(EVENT_ID, USER_ID) } returns
             detailResponse(aiStatus = AiAnalysisStatus.FAILED, aiSummary = null)
 
-        mockMvc.perform(get("/api/v1/events/$EVENT_ID/report").header("X-User-Id", USER_ID))
+        mockMvc.perform(get("/api/v1/events/$EVENT_ID/report").with(authentication(principalOf(USER_ID))))
             .andExpect(status().isOk)
             .andExpect(jsonPath("$.data.aiStatus").value("FAILED"))
             .andExpect(jsonPath("$.data.aiSummary").doesNotExist())
@@ -84,7 +91,7 @@ class ReportControllerTest {
         every { reportQueryService.getReport(EVENT_ID, USER_ID) } throws
             BusinessException(ErrorCode.REPORT_NOT_FOUND)
 
-        mockMvc.perform(get("/api/v1/events/$EVENT_ID/report").header("X-User-Id", USER_ID))
+        mockMvc.perform(get("/api/v1/events/$EVENT_ID/report").with(authentication(principalOf(USER_ID))))
             .andExpect(status().isNotFound)
             .andExpect(jsonPath("$.code").value("REPORT_NOT_FOUND"))
     }
@@ -95,7 +102,7 @@ class ReportControllerTest {
         every { reportQueryService.getReport(EVENT_ID, USER_ID) } throws
             BusinessException(ErrorCode.NOT_GROUP_MEMBER)
 
-        mockMvc.perform(get("/api/v1/events/$EVENT_ID/report").header("X-User-Id", USER_ID))
+        mockMvc.perform(get("/api/v1/events/$EVENT_ID/report").with(authentication(principalOf(USER_ID))))
             .andExpect(status().isForbidden)
             .andExpect(jsonPath("$.code").value("NOT_GROUP_MEMBER"))
     }
@@ -114,7 +121,7 @@ class ReportControllerTest {
                 generatedAt = null,
             )
 
-        mockMvc.perform(get("/api/v1/events/$EVENT_ID/report/status").header("X-User-Id", USER_ID))
+        mockMvc.perform(get("/api/v1/events/$EVENT_ID/report/status").with(authentication(principalOf(USER_ID))))
             .andExpect(status().isOk)
             .andExpect(jsonPath("$.data.status").value("GENERATING"))
             .andExpect(jsonPath("$.data.downloadable").value(false))
@@ -122,10 +129,13 @@ class ReportControllerTest {
     }
 
     @Test
-    @DisplayName("사용자 ID 헤더가 없으면 400")
-    fun missingUserHeader() {
+    @DisplayName("토큰 없이 조회하면 401이다")
+    fun getReportUnauthenticated() {
+        // 예전에는 X-User-Id 헤더가 없으면 400이었다. 이제 사용자는 토큰에서만 나오므로,
+        // 헤더 누락이 아니라 인증 없음으로 판정된다.
         mockMvc.perform(get("/api/v1/events/$EVENT_ID/report"))
-            .andExpect(status().isBadRequest)
+            .andExpect(status().isUnauthorized)
+            .andExpect(jsonPath("$.code").value("UNAUTHORIZED"))
     }
 
     @Test
@@ -138,7 +148,7 @@ class ReportControllerTest {
                 expiresAt = LocalDateTime.of(2026, 8, 24, 10, 5),
             )
 
-        mockMvc.perform(get("/api/v1/events/$EVENT_ID/report/pdf").header("X-User-Id", USER_ID))
+        mockMvc.perform(get("/api/v1/events/$EVENT_ID/report/pdf").with(authentication(principalOf(USER_ID))))
             .andExpect(status().isOk)
             .andExpect(jsonPath("$.data.downloadUrl").value("https://s3.example/reports/1/report.pdf?sig=x"))
             .andExpect(jsonPath("$.data.fileName").value("여름_MT_결산보고서.pdf"))
@@ -150,7 +160,7 @@ class ReportControllerTest {
         every { reportDownloadService.getCsvDownload(EVENT_ID, USER_ID) } throws
             BusinessException(ErrorCode.REPORT_NOT_DOWNLOADABLE)
 
-        mockMvc.perform(get("/api/v1/events/$EVENT_ID/report/csv").header("X-User-Id", USER_ID))
+        mockMvc.perform(get("/api/v1/events/$EVENT_ID/report/csv").with(authentication(principalOf(USER_ID))))
             .andExpect(status().isConflict)
             .andExpect(jsonPath("$.code").value("REPORT_NOT_DOWNLOADABLE"))
     }
@@ -200,7 +210,7 @@ class ReportControllerTest {
             generatedAt = LocalDateTime.of(2026, 8, 27, 10, 0),
         )
 
-        mockMvc.perform(post("/api/v1/events/$EVENT_ID/report/retry").header("X-User-Id", USER_ID))
+        mockMvc.perform(post("/api/v1/events/$EVENT_ID/report/retry").with(authentication(principalOf(USER_ID))))
             .andExpect(status().isOk)
             .andExpect(jsonPath("$.success").value(true))
             .andExpect(jsonPath("$.data.status").value("COMPLETED"))
@@ -213,19 +223,41 @@ class ReportControllerTest {
         every { reportRetryService.retry(EVENT_ID, USER_ID) } throws
             BusinessException(ErrorCode.REPORT_NOT_RETRYABLE)
 
-        mockMvc.perform(post("/api/v1/events/$EVENT_ID/report/retry").header("X-User-Id", USER_ID))
+        mockMvc.perform(post("/api/v1/events/$EVENT_ID/report/retry").with(authentication(principalOf(USER_ID))))
             .andExpect(status().isConflict)
             .andExpect(jsonPath("$.success").value(false))
             .andExpect(jsonPath("$.code").value("REPORT_NOT_RETRYABLE"))
     }
 
     @Test
-    @DisplayName("재생성에 X-User-Id가 없으면 400을 반환한다")
-    fun retryReportWithoutUserHeader() {
+    @DisplayName("토큰이 없으면 401이고 서비스까지 가지 않는다")
+    fun rejectsUnauthenticated() {
         mockMvc.perform(post("/api/v1/events/$EVENT_ID/report/retry"))
-            .andExpect(status().isBadRequest)
+            .andExpect(status().isUnauthorized)
             .andExpect(jsonPath("$.success").value(false))
+            .andExpect(jsonPath("$.code").value("UNAUTHORIZED"))
+
+        verify(exactly = 0) { reportRetryService.retry(any(), any()) }
     }
+
+    @Test
+    @DisplayName("다른 사용자의 토큰으로는 그 사용자로만 조회된다")
+    fun usesPrincipalNotClientSuppliedHeader() {
+        every { reportQueryService.getReport(EVENT_ID, USER_ID) } returns detailResponse()
+
+        // 헤더로 다른 사용자를 흉내내도 무시된다. 사용자는 토큰에서만 결정된다.
+        mockMvc.perform(
+            get("/api/v1/events/$EVENT_ID/report")
+                .with(authentication(principalOf(USER_ID)))
+                .header("X-User-Id", 999L),
+        ).andExpect(status().isOk)
+
+        verify(exactly = 0) { reportQueryService.getReport(EVENT_ID, 999L) }
+    }
+
+    /** 인증 필터가 심는 것과 같은 형태의 주체를 만든다. 주체는 사용자 ID다. */
+    private fun principalOf(userId: Long): Authentication =
+        UsernamePasswordAuthenticationToken(userId, null, emptyList())
 
     companion object {
         private const val EVENT_ID = 1L

@@ -44,8 +44,7 @@ interface ReportControllerDocs {
     )
     fun getReport(
         @Parameter(description = "행사 ID", example = "1") eventId: Long,
-        @Parameter(description = "현재 로그인 사용자 ID. auth 완성 전까지 임시로 헤더로 받는다", example = "42")
-        currentUserId: Long,
+        @Parameter(hidden = true) currentUserId: Long,
     ): ApiResponse<ReportDetailResponse>
 
     @Operation(
@@ -73,8 +72,7 @@ interface ReportControllerDocs {
     )
     fun getStatus(
         @Parameter(description = "행사 ID", example = "1") eventId: Long,
-        @Parameter(description = "현재 로그인 사용자 ID. auth 완성 전까지 임시로 헤더로 받는다", example = "42")
-        currentUserId: Long,
+        @Parameter(hidden = true) currentUserId: Long,
     ): ApiResponse<ReportStatusResponse>
 
     @Operation(
@@ -100,8 +98,7 @@ interface ReportControllerDocs {
     )
     fun getPdfDownload(
         @Parameter(description = "행사 ID", example = "1") eventId: Long,
-        @Parameter(description = "현재 로그인 사용자 ID. auth 완성 전까지 임시로 헤더로 받는다", example = "42")
-        currentUserId: Long,
+        @Parameter(hidden = true) currentUserId: Long,
     ): ApiResponse<ReportDownloadResponse>
 
     @Operation(
@@ -124,8 +121,7 @@ interface ReportControllerDocs {
     )
     fun getCsvDownload(
         @Parameter(description = "행사 ID", example = "1") eventId: Long,
-        @Parameter(description = "현재 로그인 사용자 ID. auth 완성 전까지 임시로 헤더로 받는다", example = "42")
-        currentUserId: Long,
+        @Parameter(hidden = true) currentUserId: Long,
     ): ApiResponse<ReportDownloadResponse>
 
     @Operation(
@@ -153,7 +149,6 @@ interface ReportControllerDocs {
     )
     fun retryReport(
         @Parameter(description = "행사 ID", example = "1") eventId: Long,
-        @Parameter(description = "현재 로그인 사용자 ID. auth 완성 전까지 임시로 헤더로 받는다", example = "42")
-        currentUserId: Long,
+        @Parameter(hidden = true) currentUserId: Long,
     ): ApiResponse<ReportStatusResponse>
 }
