@@ -8,9 +8,9 @@ import com.moasem.backend.domain.report.service.ReportQueryService
 import com.moasem.backend.domain.report.service.ReportRetryService
 import com.moasem.backend.global.response.ApiResponse
 import org.springframework.web.bind.annotation.GetMapping
+import org.springframework.security.core.annotation.AuthenticationPrincipal
 import org.springframework.web.bind.annotation.PathVariable
 import org.springframework.web.bind.annotation.PostMapping
-import org.springframework.web.bind.annotation.RequestHeader
 import org.springframework.web.bind.annotation.RequestMapping
 import org.springframework.web.bind.annotation.RestController
 
@@ -20,8 +20,8 @@ import org.springframework.web.bind.annotation.RestController
  * 보고서는 행사당 한 건이므로 reportId 대신 eventId로 접근한다.
  * API 설명은 [ReportControllerDocs]에 있다.
  *
- * 현재 로그인 사용자는 임시로 헤더에서 받는다. auth 도메인이 완성되면
- * @AuthenticationPrincipal 로 교체한다.
+ * 현재 로그인 사용자는 JWT에서 꺼낸다. 인증 필터가 토큰을 검증해 사용자 ID를 주체로
+ * 심어 두므로, 컨트롤러는 그 값을 그대로 받는다.
  */
 @RestController
 @RequestMapping("/api/v1/events/{eventId}/report")
@@ -34,39 +34,35 @@ class ReportController(
     @GetMapping
     override fun getReport(
         @PathVariable eventId: Long,
-        @RequestHeader(USER_ID_HEADER) currentUserId: Long,
+        @AuthenticationPrincipal currentUserId: Long,
     ): ApiResponse<ReportDetailResponse> =
         ApiResponse.success(reportQueryService.getReport(eventId, currentUserId))
 
     @GetMapping("/status")
     override fun getStatus(
         @PathVariable eventId: Long,
-        @RequestHeader(USER_ID_HEADER) currentUserId: Long,
+        @AuthenticationPrincipal currentUserId: Long,
     ): ApiResponse<ReportStatusResponse> =
         ApiResponse.success(reportQueryService.getStatus(eventId, currentUserId))
 
     @GetMapping("/pdf")
     override fun getPdfDownload(
         @PathVariable eventId: Long,
-        @RequestHeader(USER_ID_HEADER) currentUserId: Long,
+        @AuthenticationPrincipal currentUserId: Long,
     ): ApiResponse<ReportDownloadResponse> =
         ApiResponse.success(reportDownloadService.getPdfDownload(eventId, currentUserId))
 
     @GetMapping("/csv")
     override fun getCsvDownload(
         @PathVariable eventId: Long,
-        @RequestHeader(USER_ID_HEADER) currentUserId: Long,
+        @AuthenticationPrincipal currentUserId: Long,
     ): ApiResponse<ReportDownloadResponse> =
         ApiResponse.success(reportDownloadService.getCsvDownload(eventId, currentUserId))
 
     @PostMapping("/retry")
     override fun retryReport(
         @PathVariable eventId: Long,
-        @RequestHeader(USER_ID_HEADER) currentUserId: Long,
+        @AuthenticationPrincipal currentUserId: Long,
     ): ApiResponse<ReportStatusResponse> =
         ApiResponse.success(reportRetryService.retry(eventId, currentUserId))
-
-    companion object {
-        const val USER_ID_HEADER = "X-User-Id"
-    }
 }
