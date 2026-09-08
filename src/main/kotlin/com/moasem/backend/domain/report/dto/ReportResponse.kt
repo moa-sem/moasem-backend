@@ -1,6 +1,8 @@
 package com.moasem.backend.domain.report.dto
 
 import com.moasem.backend.domain.report.entity.AiAnalysisStatus
+import com.moasem.backend.domain.report.entity.Report
+import com.moasem.backend.domain.report.entity.ReportSnapshot
 import com.moasem.backend.domain.report.entity.ReportStatus
 import io.swagger.v3.oas.annotations.media.Schema
 import java.time.LocalDateTime
@@ -32,7 +34,19 @@ data class ReportStatusResponse(
 
     @field:Schema(description = "생성 완료 시각")
     val generatedAt: LocalDateTime?,
-)
+) {
+    companion object {
+        fun from(report: Report) = ReportStatusResponse(
+            eventId = report.eventId,
+            status = report.status,
+            aiStatus = report.aiStatus,
+            downloadable = report.isDownloadable,
+            retryable = report.status.isRetryable,
+            failureReason = report.failureReason,
+            generatedAt = report.generatedAt,
+        )
+    }
+}
 
 /**
  * 결산 보고서 내용.
@@ -65,7 +79,29 @@ data class ReportDetailResponse(
 
     @field:Schema(description = "생성 완료 시각")
     val generatedAt: LocalDateTime?,
-)
+) {
+    companion object {
+        fun from(report: Report, snapshot: ReportSnapshot): ReportDetailResponse {
+            // 지출 내역에도 한글 라벨을 붙인다. 라벨은 tagTotals가 이미 갖고 있어
+            // 지출 한 건만 보고는 알 수 없다.
+            val labels = snapshot.tagTotals.associate { it.tag to it.label }
+
+            return ReportDetailResponse(
+                eventId = report.eventId,
+                status = report.status,
+                aiStatus = report.aiStatus,
+                aiSummary = report.aiSummary,
+                event = EventSummaryResponse.from(snapshot.event),
+                budget = BudgetSummaryResponse.from(snapshot.budget),
+                tagTotals = snapshot.tagTotals.map(TagTotalResponse::from),
+                spendings = snapshot.spendings.map {
+                    SpendingLineResponse.from(it, labels[it.tag] ?: it.tag)
+                },
+                generatedAt = report.generatedAt,
+            )
+        }
+    }
+}
 
 @Schema(description = "행사 정보")
 data class EventSummaryResponse(
@@ -76,7 +112,17 @@ data class EventSummaryResponse(
 
     @field:Schema(description = "참여 인원. 마감 시 입력된 값")
     val participantCount: Int?,
-)
+) {
+    companion object {
+        fun from(event: ReportSnapshot.EventSummary) = EventSummaryResponse(
+            title = event.title,
+            startAt = event.startAt,
+            endAt = event.endAt,
+            groupName = event.groupName,
+            participantCount = event.participantCount,
+        )
+    }
+}
 
 @Schema(description = "결산 요약")
 data class BudgetSummaryResponse(
@@ -92,7 +138,17 @@ data class BudgetSummaryResponse(
     val remainingBalance: Long,
 
     val additions: List<BudgetAdditionResponse>,
-)
+) {
+    companion object {
+        fun from(budget: ReportSnapshot.BudgetSummary) = BudgetSummaryResponse(
+            initialBudget = budget.initialBudget,
+            totalBudget = budget.totalBudget,
+            totalSpent = budget.totalSpent,
+            remainingBalance = budget.remainingBalance,
+            additions = budget.additions.map(BudgetAdditionResponse::from),
+        )
+    }
+}
 
 @Schema(description = "추가 예산 내역")
 data class BudgetAdditionResponse(
@@ -100,7 +156,16 @@ data class BudgetAdditionResponse(
     val reason: String,
     val addedBy: String?,
     val addedAt: LocalDateTime,
-)
+) {
+    companion object {
+        fun from(addition: ReportSnapshot.BudgetAdditionLine) = BudgetAdditionResponse(
+            amount = addition.amount,
+            reason = addition.reason,
+            addedBy = addition.addedBy,
+            addedAt = addition.addedAt,
+        )
+    }
+}
 
 @Schema(description = "태그별 지출 집계")
 data class TagTotalResponse(
@@ -112,7 +177,16 @@ data class TagTotalResponse(
 
     val amount: Long,
     val count: Int,
-)
+) {
+    companion object {
+        fun from(tagTotal: ReportSnapshot.TagTotal) = TagTotalResponse(
+            tag = tagTotal.tag,
+            label = tagTotal.label,
+            amount = tagTotal.amount,
+            count = tagTotal.count,
+        )
+    }
+}
 
 @Schema(description = "지출 내역 한 건")
 data class SpendingLineResponse(
@@ -134,4 +208,21 @@ data class SpendingLineResponse(
         example = "true",
     )
     val hasReceipt: Boolean,
-)
+) {
+    companion object {
+        /**
+         * 라벨은 스냅샷의 지출 한 건에 들어 있지 않아 밖에서 받는다.
+         * 태그별 집계가 갖고 있는 값을 그대로 쓴다.
+         */
+        fun from(line: ReportSnapshot.SpendingLine, label: String) = SpendingLineResponse(
+            spendingId = line.spendingId,
+            description = line.description,
+            amount = line.amount,
+            tag = line.tag,
+            label = label,
+            payerName = line.payerName,
+            spentAt = line.spentAt,
+            hasReceipt = line.receiptKey != null,
+        )
+    }
+}
