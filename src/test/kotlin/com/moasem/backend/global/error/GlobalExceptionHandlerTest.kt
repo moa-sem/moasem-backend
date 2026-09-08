@@ -1,6 +1,7 @@
 package com.moasem.backend.global.error
 
 import com.moasem.backend.global.response.ApiResponse
+import org.assertj.core.api.Assertions.assertThat
 import jakarta.validation.Valid
 import jakarta.validation.constraints.Min
 import jakarta.validation.constraints.NotBlank
@@ -120,6 +121,61 @@ class GlobalExceptionHandlerTest {
         mockMvc.perform(get("/test/missing"))
             .andExpect(status().isNotFound)
             .andExpect(jsonPath("$.code").value("ENTITY_NOT_FOUND"))
+    }
+
+    @Test
+    @DisplayName("읽을 수 없는 본문은 500이 아니라 400이다")
+    fun malformedBody() {
+        // 서버 잘못이 아니라 요청이 잘못된 경우다. 500으로 내려가면 프론트가 재시도할
+        // 오류로 오해하고, 서버 로그에도 장애처럼 쌓인다.
+        mockMvc.perform(
+            post("/test/validate")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{ this is not json"),
+        )
+            .andExpect(status().isBadRequest)
+            .andExpect(jsonPath("$.success").value(false))
+            .andExpect(jsonPath("$.code").value("MALFORMED_REQUEST_BODY"))
+    }
+
+    @Test
+    @DisplayName("타입이 맞지 않는 필드는 어느 필드인지 알려준다")
+    fun malformedFieldIsNamed() {
+        mockMvc.perform(
+            post("/test/validate")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("""{"title":"여름 MT","amount":"천원"}"""),
+        )
+            .andExpect(status().isBadRequest)
+            .andExpect(jsonPath("$.code").value("MALFORMED_REQUEST_BODY"))
+            .andExpect(jsonPath("$.message").value("'amount' 값의 형식이 올바르지 않습니다."))
+    }
+
+    @Test
+    @DisplayName("파싱 오류 메시지에 요청 본문이나 내부 클래스명이 섞여 나가지 않는다")
+    fun malformedBodyDoesNotLeakInternals() {
+        val result = mockMvc.perform(
+            post("/test/validate")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("""{"title":"비밀값","amount":"천원"}"""),
+        )
+            .andExpect(status().isBadRequest)
+            .andReturn()
+
+        val body = result.response.getContentAsString(Charsets.UTF_8)
+        assertThat(body).doesNotContain("비밀값", "TestRequest", "com.moasem", "tools.jackson")
+    }
+
+    @Test
+    @DisplayName("지원하지 않는 Content-Type은 415다")
+    fun unsupportedMediaType() {
+        mockMvc.perform(
+            post("/test/validate")
+                .contentType(MediaType.TEXT_PLAIN)
+                .content("제목"),
+        )
+            .andExpect(status().isUnsupportedMediaType)
+            .andExpect(jsonPath("$.code").value("UNSUPPORTED_MEDIA_TYPE"))
     }
 }
 
