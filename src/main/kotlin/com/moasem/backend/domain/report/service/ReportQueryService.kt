@@ -1,6 +1,5 @@
 package com.moasem.backend.domain.report.service
 
-import com.moasem.backend.domain.report.converter.ReportConverter
 import com.moasem.backend.domain.report.dto.ReportDetailResponse
 import com.moasem.backend.domain.report.dto.ReportStatusResponse
 import com.moasem.backend.global.error.BusinessException
@@ -18,7 +17,6 @@ import org.springframework.transaction.annotation.Transactional
 @Transactional(readOnly = true)
 class ReportQueryService(
     private val accessGuard: ReportAccessGuard,
-    private val converter: ReportConverter,
 ) {
 
     /**
@@ -28,7 +26,7 @@ class ReportQueryService(
      */
     fun getStatus(eventId: Long, currentUserId: Long): ReportStatusResponse {
         val report = accessGuard.findAccessibleReport(eventId, currentUserId)
-        return converter.toStatusResponse(report)
+        return ReportStatusResponse.from(report)
     }
 
     /**
@@ -40,6 +38,6 @@ class ReportQueryService(
     fun getReport(eventId: Long, currentUserId: Long): ReportDetailResponse {
         val report = accessGuard.findAccessibleReport(eventId, currentUserId)
         val snapshot = report.snapshot ?: throw BusinessException(ErrorCode.REPORT_GENERATING)
-        return converter.toDetailResponse(report, snapshot)
+        return ReportDetailResponse.from(report, snapshot)
     }
 }

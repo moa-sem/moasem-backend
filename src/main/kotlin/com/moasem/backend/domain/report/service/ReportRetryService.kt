@@ -1,6 +1,5 @@
 package com.moasem.backend.domain.report.service
 
-import com.moasem.backend.domain.report.converter.ReportConverter
 import com.moasem.backend.domain.report.dto.ReportStatusResponse
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
@@ -16,7 +15,6 @@ import org.springframework.transaction.annotation.Transactional
 class ReportRetryService(
     private val accessGuard: ReportAccessGuard,
     private val generationService: ReportGenerationService,
-    private val converter: ReportConverter,
 ) {
 
     /**
@@ -34,6 +32,6 @@ class ReportRetryService(
         accessGuard.findAccessibleReport(eventId, currentUserId)
 
         val report = generationService.retry(eventId)
-        return converter.toStatusResponse(report)
+        return ReportStatusResponse.from(report)
     }
 }

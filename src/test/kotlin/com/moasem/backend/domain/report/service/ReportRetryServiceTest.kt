@@ -1,6 +1,5 @@
 package com.moasem.backend.domain.report.service
 
-import com.moasem.backend.domain.report.converter.ReportConverter
 import com.moasem.backend.domain.report.entity.Report
 import com.moasem.backend.domain.report.entity.ReportStatus
 import com.moasem.backend.domain.report.repository.ReportRepository
@@ -59,7 +58,6 @@ class ReportRetryServiceTest {
         service = ReportRetryService(
             accessGuard = ReportAccessGuard(reportRepository, membershipProvider),
             generationService = generationService,
-            converter = ReportConverter(),
         )
     }
 

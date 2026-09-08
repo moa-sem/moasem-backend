@@ -1,6 +1,5 @@
 package com.moasem.backend.domain.report.service
 
-import com.moasem.backend.domain.report.converter.ReportConverter
 import com.moasem.backend.domain.report.entity.AiAnalysisStatus
 import com.moasem.backend.domain.report.entity.Report
 import com.moasem.backend.domain.report.entity.ReportStatus
@@ -27,7 +26,7 @@ class ReportQueryServiceTest {
 
     // 권한 검증까지 함께 확인하도록 guard는 실제 구현을 쓴다.
     private val accessGuard = ReportAccessGuard(reportRepository, membershipProvider)
-    private val service = ReportQueryService(accessGuard, ReportConverter())
+    private val service = ReportQueryService(accessGuard)
 
     @BeforeEach
     fun setUp() {
