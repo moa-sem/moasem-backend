@@ -1,56 +1,29 @@
 package com.moasem.backend.global.dev
 
-import com.moasem.backend.domain.report.repository.ReportRepository
-import com.moasem.backend.domain.report.service.ReportGenerationService
 import com.moasem.backend.domain.report.service.adapter.LocalReportFileStorage
 import com.moasem.backend.global.response.ApiResponse
 import jakarta.servlet.http.HttpServletRequest
 import org.springframework.context.annotation.Profile
 import org.springframework.http.HttpHeaders
 import org.springframework.http.ResponseEntity
-import org.springframework.transaction.annotation.Transactional
 import org.springframework.web.bind.annotation.GetMapping
-import org.springframework.web.bind.annotation.PathVariable
-import org.springframework.web.bind.annotation.PostMapping
 import org.springframework.web.bind.annotation.RequestMapping
 import org.springframework.web.bind.annotation.RestController
 
 /**
- * 로컬에서 보고서 흐름을 직접 확인하기 위한 임시 컨트롤러.
+ * 로컬 저장소에 저장된 보고서 파일을 서빙하는 임시 컨트롤러.
  *
- * 두 가지가 없어서 둔다.
- * - 보고서를 만드는 실제 트리거(행사 마감)를 호출할 event 컨트롤러가 아직 없다.
- * - 로컬에는 S3가 없어 다운로드 URL이 가리킬 곳이 없다.
+ * 로컬에는 S3가 없어 다운로드 URL이 가리킬 곳이 없다. 그 자리만 대신한다.
+ * 샘플 보고서를 만들어 주던 엔드포인트는 실제 마감 데이터로 보고서가 만들어지게 되면서 지웠다.
  *
- * 둘 다 채워지면 이 컨트롤러는 지운다. API 설명은 [DevReportControllerDocs]에 있다.
+ * API 설명은 [DevReportControllerDocs]에 있다.
  */
 @Profile("local")
 @RestController
 @RequestMapping("/api/v1/dev")
 class DevReportController(
-    private val snapshotStore: DevEventSnapshotStore,
-    private val reportGenerationService: ReportGenerationService,
-    private val reportRepository: ReportRepository,
     private val fileStorage: LocalReportFileStorage,
 ) : DevReportControllerDocs {
-
-    /**
-     * 기존 보고서를 지우고 다시 만든다.
-     *
-     * 행사당 보고서는 하나뿐이라 두 번째 호출부터는 REPORT_ALREADY_EXISTS로 막힌다.
-     * 스웨거에서 반복해서 눌러 보는 게 이 API의 용도라 매번 새로 만든다.
-     */
-    @PostMapping("/reports/{eventId}")
-    @Transactional
-    override fun seedReport(@PathVariable eventId: Long): ApiResponse<DevReportSeedResponse> {
-        reportRepository.findByEventId(eventId)?.let(reportRepository::delete)
-        reportRepository.flush()
-
-        snapshotStore.seed(eventId)
-        val report = reportGenerationService.generate(eventId)
-
-        return ApiResponse.success(DevReportSeedResponse.from(report, SAMPLE_USER_ID))
-    }
 
     /**
      * 저장된 파일을 그대로 내려준다.
@@ -73,10 +46,5 @@ class DevReportController(
         "pdf" -> "application/pdf"
         "csv" -> "text/csv; charset=UTF-8"
         else -> "application/octet-stream"
-    }
-
-    companion object {
-        /** 로컬 스텁이 모든 사용자를 구성원으로 보므로 어떤 값이든 통과한다. */
-        private const val SAMPLE_USER_ID = 42L
     }
 }

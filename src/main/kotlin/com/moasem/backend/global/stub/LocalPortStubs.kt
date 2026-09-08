@@ -5,8 +5,6 @@ import com.moasem.backend.domain.event.service.port.GroupAccessProvider
 import com.moasem.backend.domain.event.service.port.PendingSpendingCountProvider
 import com.moasem.backend.domain.event.service.port.SpendingHistoryProvider
 import com.moasem.backend.domain.report.service.port.AiAnalysisInput
-import com.moasem.backend.domain.report.service.port.EventSnapshotData
-import com.moasem.backend.domain.report.service.port.EventSnapshotProvider
 import com.moasem.backend.domain.report.service.port.ReportAiClient
 import com.moasem.backend.domain.spending.service.port.GroupAccessProvider as SpendingGroupAccessProvider
 import org.springframework.boot.autoconfigure.condition.ConditionalOnMissingBean
@@ -17,9 +15,9 @@ import org.springframework.context.annotation.Profile
 /**
  * 아직 구현체가 없는 port를 로컬에서만 임시로 채운다.
  *
- * spending·auth 도메인이 미완성이라 해당 port의 어댑터가 없고, 그 결과 애플리케이션이
- * 빈 주입 단계에서 기동조차 되지 않는다. 각 도메인이 컨트롤러를 검증하거나 Swagger를 확인할
- * 방법이 없어 임시로 둔다.
+ * spending의 모임 권한 조회와 AI 클라이언트에 아직 어댑터가 없고, 그 결과 애플리케이션이
+ * 빈 주입 단계에서 기동조차 되지 않는다. 컨트롤러를 검증하거나 Swagger를 확인할 방법이
+ * 없어 임시로 둔다.
  *
  * 안전장치 두 가지를 걸어 둔다.
  * - `@Profile("!prod")` — 운영 프로파일에서는 등록되지 않는다. 로컬과 테스트에서만 뜬다.
@@ -67,24 +65,6 @@ class LocalPortStubs {
     @ConditionalOnMissingBean(SpendingHistoryProvider::class)
     fun stubSpendingHistoryProvider() = object : SpendingHistoryProvider {
         override fun hasAnySpending(eventId: Long) = false
-    }
-
-    /**
-     * 결산 원자료는 그럴듯한 가짜를 만들어 내지 않는다.
-     *
-     * 없는 값을 지어내면 잘못된 금액이 스냅샷에 확정 저장되고, 스냅샷은 불변이라 되돌릴 수
-     * 없다. 아직 연결되지 않았다는 사실이 드러나는 편이 낫다.
-     *
-     * 로컬에서는 [com.moasem.backend.global.dev.DevEventSnapshotStore]가 대신 등록된다.
-     * 그쪽도 개발자가 명시적으로 요청한 행사에만 샘플을 만들어 준다.
-     */
-    @Bean
-    @ConditionalOnMissingBean(EventSnapshotProvider::class)
-    fun stubEventSnapshotProvider() = object : EventSnapshotProvider {
-        override fun fetch(eventId: Long): EventSnapshotData =
-            throw UnsupportedOperationException(
-                "EventSnapshotProvider 어댑터가 아직 없습니다. spending·group 도메인 완성 후 연결됩니다.",
-            )
     }
 
     @Bean
