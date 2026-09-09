@@ -56,8 +56,7 @@ interface SpendingControllerDocs {
     )
     fun issueEvidenceUploadUrl(
         @Parameter(description = "행사 ID", example = "1") eventId: Long,
-        @Parameter(description = "현재 로그인 사용자 ID. auth 완성 전까지 임시로 헤더로 받는다", example = "42")
-        currentUserId: Long,
+        @Parameter(hidden = true) currentUserId: Long,
         request: EvidenceUploadUrlRequest,
     ): ApiResponse<EvidenceUploadUrlResponse>
 
@@ -85,7 +84,7 @@ interface SpendingControllerDocs {
     )
     fun createSpending(
         @Parameter(description = "행사 ID", example = "1") eventId: Long,
-        @Parameter(description = "현재 로그인 사용자 ID", example = "42") currentUserId: Long,
+        @Parameter(hidden = true) currentUserId: Long,
         request: CreateSpendingRequest,
     ): ResponseEntity<ApiResponse<SpendingDetailResponse>>
 
@@ -113,7 +112,7 @@ interface SpendingControllerDocs {
     fun updateSpending(
         @Parameter(description = "행사 ID", example = "1") eventId: Long,
         @Parameter(description = "지출 ID", example = "10") spendingId: Long,
-        @Parameter(description = "현재 로그인 사용자 ID", example = "42") currentUserId: Long,
+        @Parameter(hidden = true) currentUserId: Long,
         request: UpdateSpendingRequest,
     ): ApiResponse<SpendingDetailResponse>
 
@@ -133,7 +132,7 @@ interface SpendingControllerDocs {
     )
     fun getSpendings(
         @Parameter(description = "행사 ID", example = "1") eventId: Long,
-        @Parameter(description = "현재 로그인 사용자 ID", example = "42") currentUserId: Long,
+        @Parameter(hidden = true) currentUserId: Long,
         @Parameter(description = "상태 필터. 없으면 전체") status: SpendingStatus?,
         pageable: Pageable,
     ): ApiResponse<PagedModel<SpendingListResponse>>
@@ -154,7 +153,7 @@ interface SpendingControllerDocs {
     fun getSpending(
         @Parameter(description = "행사 ID", example = "1") eventId: Long,
         @Parameter(description = "지출 ID", example = "10") spendingId: Long,
-        @Parameter(description = "현재 로그인 사용자 ID", example = "42") currentUserId: Long,
+        @Parameter(hidden = true) currentUserId: Long,
     ): ApiResponse<SpendingDetailResponse>
 
     @Operation(
@@ -176,7 +175,7 @@ interface SpendingControllerDocs {
     fun issueEvidenceDownloadUrl(
         @Parameter(description = "행사 ID", example = "1") eventId: Long,
         @Parameter(description = "지출 ID", example = "10") spendingId: Long,
-        @Parameter(description = "현재 로그인 사용자 ID", example = "42") currentUserId: Long,
+        @Parameter(hidden = true) currentUserId: Long,
     ): ApiResponse<EvidenceDownloadUrlResponse>
 
     @Operation(
@@ -199,7 +198,7 @@ interface SpendingControllerDocs {
     fun approveSpending(
         @Parameter(description = "행사 ID", example = "1") eventId: Long,
         @Parameter(description = "지출 ID", example = "10") spendingId: Long,
-        @Parameter(description = "현재 로그인 사용자 ID(모임장)", example = "7") currentUserId: Long,
+        @Parameter(hidden = true) currentUserId: Long,
     ): ApiResponse<SpendingDetailResponse>
 
     @Operation(
@@ -221,7 +220,7 @@ interface SpendingControllerDocs {
     fun rejectSpending(
         @Parameter(description = "행사 ID", example = "1") eventId: Long,
         @Parameter(description = "지출 ID", example = "10") spendingId: Long,
-        @Parameter(description = "현재 로그인 사용자 ID(모임장)", example = "7") currentUserId: Long,
+        @Parameter(hidden = true) currentUserId: Long,
         request: RejectSpendingRequest,
     ): ApiResponse<SpendingDetailResponse>
 }
