@@ -80,6 +80,32 @@ class GroupMembershipAdapterTest @Autowired constructor(
     }
 
     @Test
+    @DisplayName("groupHostId와 같은 사용자가 모임장이다")
+    fun hostIsOwner() {
+        val owner = saveUser("김소담")
+        val member = saveUser("윤석주")
+        val group = saveGroup(hostId = userId(owner))
+        saveMember(group, owner, GroupRole.OWNER)
+        saveMember(group, member, GroupRole.MEMBER)
+
+        assertThat(adapter.isOwner(groupId(group), userId(owner))).isTrue()
+        assertThat(adapter.isOwner(groupId(group), userId(member))).isFalse()
+    }
+
+    @Test
+    @DisplayName("비활성·삭제된 모임과 없는 모임에는 모임장이 없다")
+    fun inactiveOrMissingGroupHasNoOwner() {
+        val owner = saveUser("김소담")
+        val inactive = saveGroup(hostId = userId(owner), status = GroupStatus.INACTIVE)
+        val deleted = saveGroup(hostId = userId(owner), deletedAt = LocalDateTime.of(2026, 9, 1, 12, 0))
+
+        assertThat(adapter.isOwner(groupId(inactive), userId(owner))).isFalse()
+        assertThat(adapter.isOwner(groupId(deleted), userId(owner))).isFalse()
+        assertThat(adapter.isOwner(MISSING_GROUP_ID, userId(owner))).isFalse()
+        assertThat(adapter.isOwner(0L, userId(owner))).isFalse()
+    }
+
+    @Test
     @DisplayName("모임 이름을 조회한다")
     fun findsGroupName() {
         val group = saveGroup(name = "백엔드 스터디")
