@@ -58,6 +58,8 @@ data class SpendingDetailResponse(
 data class SpendingListResponse(
     val spendingId: Long,
     val applicantUserId: Long,
+    @field:Schema(description = "신청자 이름. 탈퇴한 사용자는 대체 표기가 들어간다", example = "김소담")
+    val applicantName: String,
     val amount: Long,
     val spentOn: LocalDate,
     val reason: String,
@@ -68,9 +70,13 @@ data class SpendingListResponse(
     val createdAt: LocalDateTime?,
 ) {
     companion object {
-        fun from(spending: Spending): SpendingListResponse = SpendingListResponse(
+        /** 탈퇴한 사용자의 지출이 남아 있을 수 있다. 그 한 건 때문에 목록 전체가 실패하지는 않는다. */
+        const val UNKNOWN_APPLICANT_NAME = "탈퇴한 사용자"
+
+        fun from(spending: Spending, applicantName: String?): SpendingListResponse = SpendingListResponse(
             spendingId = spending.requireId(),
             applicantUserId = spending.applicantUserId,
+            applicantName = applicantName ?: UNKNOWN_APPLICANT_NAME,
             amount = spending.amount,
             spentOn = spending.spentOn,
             reason = spending.reason,

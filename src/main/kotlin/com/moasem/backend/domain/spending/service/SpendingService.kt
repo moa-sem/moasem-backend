@@ -13,6 +13,7 @@ import com.moasem.backend.domain.spending.repository.SpendingRepository
 import com.moasem.backend.domain.spending.service.port.EventAccess
 import com.moasem.backend.domain.spending.service.port.EventAccessProvider
 import com.moasem.backend.domain.spending.service.port.GroupAccessProvider
+import com.moasem.backend.domain.spending.service.port.UserNameProvider
 import com.moasem.backend.global.error.BusinessException
 import com.moasem.backend.global.error.ErrorCode
 import com.moasem.backend.global.storage.FileUploadPolicy
@@ -31,6 +32,7 @@ class SpendingService(
     private val eventAccessProvider: EventAccessProvider,
     private val groupAccessProvider: GroupAccessProvider,
     private val privateFileStorage: PrivateFileStorage,
+    private val userNameProvider: UserNameProvider,
 ) {
 
     /**
@@ -147,7 +149,10 @@ class SpendingService(
         } else {
             spendingRepository.findAllByEventIdAndStatus(eventId, status, pageable)
         }
-        return spendings.map(SpendingListResponse::from)
+
+        // 한 페이지에 필요한 이름을 한 번에 모아 온다. 건별로 물어보면 지출 수만큼 조회가 나간다.
+        val names = userNameProvider.findNames(spendings.content.map { it.applicantUserId })
+        return spendings.map { SpendingListResponse.from(it, names[it.applicantUserId]) }
     }
 
     @Transactional(readOnly = true)

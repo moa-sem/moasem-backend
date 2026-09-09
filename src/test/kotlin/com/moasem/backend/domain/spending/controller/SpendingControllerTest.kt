@@ -247,6 +247,7 @@ class SpendingControllerTest {
     private fun listResponse() = SpendingListResponse(
         spendingId = SPENDING_ID,
         applicantUserId = USER_ID,
+        applicantName = "김소담",
         amount = 15_000L,
         spentOn = LocalDate.of(2026, 8, 20),
         reason = "1일차 점심 식사",
