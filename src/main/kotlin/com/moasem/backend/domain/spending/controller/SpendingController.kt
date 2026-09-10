@@ -18,12 +18,12 @@ import org.springframework.data.domain.Sort
 import org.springframework.data.web.PageableDefault
 import org.springframework.data.web.PagedModel
 import org.springframework.http.ResponseEntity
+import org.springframework.security.core.annotation.AuthenticationPrincipal
 import org.springframework.web.bind.annotation.GetMapping
 import org.springframework.web.bind.annotation.PatchMapping
 import org.springframework.web.bind.annotation.PathVariable
 import org.springframework.web.bind.annotation.PostMapping
 import org.springframework.web.bind.annotation.RequestBody
-import org.springframework.web.bind.annotation.RequestHeader
 import org.springframework.web.bind.annotation.RequestMapping
 import org.springframework.web.bind.annotation.RequestParam
 import org.springframework.web.bind.annotation.RestController
@@ -35,8 +35,9 @@ import java.net.URI
  * 지출은 행사에 종속되므로 항상 행사 경로 아래에서 다룬다. 경로의 행사와 지출이 실제로
  * 이어져 있는지는 서비스가 함께 확인한다. API 설명은 [SpendingControllerDocs]에 있다.
  *
- * 현재 로그인 사용자는 임시로 헤더에서 받는다. auth 도메인이 완성되면
- * @AuthenticationPrincipal 로 교체한다.
+ * 현재 로그인 사용자는 JWT에서 꺼낸다. 인증 필터가 토큰을 검증해 사용자 ID를 주체로
+ * 심어 두므로, 컨트롤러는 그 값을 그대로 받는다. 클라이언트가 헤더로 남의 ID를 적어 넣을
+ * 여지를 없앤다.
  */
 @RestController
 @RequestMapping("/api/v1/events/{eventId}/spendings")
@@ -48,7 +49,7 @@ class SpendingController(
     @PostMapping("/evidence-upload-url")
     override fun issueEvidenceUploadUrl(
         @PathVariable eventId: Long,
-        @RequestHeader(USER_ID_HEADER) currentUserId: Long,
+        @AuthenticationPrincipal currentUserId: Long,
         @Valid @RequestBody request: EvidenceUploadUrlRequest,
     ): ApiResponse<EvidenceUploadUrlResponse> =
         ApiResponse.success(spendingService.issueEvidenceUploadUrl(eventId, currentUserId, request))
@@ -57,7 +58,7 @@ class SpendingController(
     @PostMapping
     override fun createSpending(
         @PathVariable eventId: Long,
-        @RequestHeader(USER_ID_HEADER) currentUserId: Long,
+        @AuthenticationPrincipal currentUserId: Long,
         @Valid @RequestBody request: CreateSpendingRequest,
     ): ResponseEntity<ApiResponse<SpendingDetailResponse>> {
         val response = spendingService.createSpending(eventId, currentUserId, request)
@@ -70,7 +71,7 @@ class SpendingController(
     override fun updateSpending(
         @PathVariable eventId: Long,
         @PathVariable spendingId: Long,
-        @RequestHeader(USER_ID_HEADER) currentUserId: Long,
+        @AuthenticationPrincipal currentUserId: Long,
         @Valid @RequestBody request: UpdateSpendingRequest,
     ): ApiResponse<SpendingDetailResponse> =
         ApiResponse.success(spendingService.updateSpending(eventId, spendingId, currentUserId, request))
@@ -79,7 +80,7 @@ class SpendingController(
     @GetMapping
     override fun getSpendings(
         @PathVariable eventId: Long,
-        @RequestHeader(USER_ID_HEADER) currentUserId: Long,
+        @AuthenticationPrincipal currentUserId: Long,
         @RequestParam(required = false) status: SpendingStatus?,
         @PageableDefault(size = 20, sort = ["createdAt"], direction = Sort.Direction.DESC) pageable: Pageable,
     ): ApiResponse<PagedModel<SpendingListResponse>> {
@@ -91,7 +92,7 @@ class SpendingController(
     override fun getSpending(
         @PathVariable eventId: Long,
         @PathVariable spendingId: Long,
-        @RequestHeader(USER_ID_HEADER) currentUserId: Long,
+        @AuthenticationPrincipal currentUserId: Long,
     ): ApiResponse<SpendingDetailResponse> =
         ApiResponse.success(spendingService.getSpending(eventId, spendingId, currentUserId))
 
@@ -99,7 +100,7 @@ class SpendingController(
     override fun issueEvidenceDownloadUrl(
         @PathVariable eventId: Long,
         @PathVariable spendingId: Long,
-        @RequestHeader(USER_ID_HEADER) currentUserId: Long,
+        @AuthenticationPrincipal currentUserId: Long,
     ): ApiResponse<EvidenceDownloadUrlResponse> =
         ApiResponse.success(spendingService.issueEvidenceDownloadUrl(eventId, spendingId, currentUserId))
 
@@ -107,7 +108,7 @@ class SpendingController(
     override fun approveSpending(
         @PathVariable eventId: Long,
         @PathVariable spendingId: Long,
-        @RequestHeader(USER_ID_HEADER) currentUserId: Long,
+        @AuthenticationPrincipal currentUserId: Long,
     ): ApiResponse<SpendingDetailResponse> =
         ApiResponse.success("지출을 승인했습니다.", spendingApprovalService.approve(eventId, spendingId, currentUserId))
 
@@ -115,15 +116,11 @@ class SpendingController(
     override fun rejectSpending(
         @PathVariable eventId: Long,
         @PathVariable spendingId: Long,
-        @RequestHeader(USER_ID_HEADER) currentUserId: Long,
+        @AuthenticationPrincipal currentUserId: Long,
         @Valid @RequestBody request: RejectSpendingRequest,
     ): ApiResponse<SpendingDetailResponse> =
         ApiResponse.success(
             "지출을 반려했습니다.",
             spendingApprovalService.reject(eventId, spendingId, currentUserId, request),
         )
-
-    companion object {
-        const val USER_ID_HEADER = "X-User-Id"
-    }
 }

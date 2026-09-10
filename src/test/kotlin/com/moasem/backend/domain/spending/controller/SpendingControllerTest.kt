@@ -13,9 +13,12 @@ import com.moasem.backend.domain.spending.service.SpendingService
 import com.moasem.backend.global.error.BusinessException
 import com.moasem.backend.global.error.ErrorCode
 import com.moasem.backend.global.error.GlobalExceptionHandler
-import com.moasem.backend.global.security.JwtAuthenticationFilter
+import com.moasem.backend.global.security.JwtProvider
+import com.moasem.backend.global.security.SecurityConfig
+import com.moasem.backend.global.security.SecurityExceptionHandler
 import com.ninjasquad.springmockk.MockkBean
 import io.mockk.every
+import io.mockk.verify
 import org.junit.jupiter.api.DisplayName
 import org.junit.jupiter.api.Test
 import org.springframework.beans.factory.annotation.Autowired
@@ -26,6 +29,9 @@ import org.springframework.test.context.ActiveProfiles
 import org.springframework.data.domain.PageImpl
 import org.springframework.data.domain.PageRequest
 import org.springframework.http.MediaType
+import org.springframework.security.authentication.UsernamePasswordAuthenticationToken
+import org.springframework.security.core.Authentication
+import org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.authentication
 import org.springframework.test.web.servlet.MockMvc
 import org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get
 import org.springframework.test.web.servlet.request.MockMvcRequestBuilders.patch
@@ -45,8 +51,8 @@ import java.time.LocalDateTime
  * 후자는 서비스 단위 테스트로는 절대 확인되지 않는 부분이다.
  */
 @WebMvcTest(controllers = [SpendingController::class])
-@Import(GlobalExceptionHandler::class)
-@AutoConfigureMockMvc(addFilters = false)
+@Import(GlobalExceptionHandler::class, SecurityConfig::class, SecurityExceptionHandler::class)
+@AutoConfigureMockMvc
 @ActiveProfiles("test")
 class SpendingControllerTest {
 
@@ -58,7 +64,7 @@ class SpendingControllerTest {
     private lateinit var objectMapper: ObjectMapper
 
     @MockkBean
-    private lateinit var jwtAuthenticationFilter: JwtAuthenticationFilter
+    private lateinit var jwtProvider: JwtProvider
 
     @MockkBean
     private lateinit var spendingService: SpendingService
@@ -73,7 +79,7 @@ class SpendingControllerTest {
 
         mockMvc.perform(
             post("/api/v1/events/$EVENT_ID/spendings")
-                .header(SpendingController.USER_ID_HEADER, USER_ID)
+                .with(authentication(principalOf(USER_ID)))
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(objectMapper.writeValueAsString(createRequest())),
         )
@@ -92,7 +98,7 @@ class SpendingControllerTest {
 
         mockMvc.perform(
             get("/api/v1/events/$EVENT_ID/spendings/$SPENDING_ID")
-                .header(SpendingController.USER_ID_HEADER, USER_ID),
+                .with(authentication(principalOf(USER_ID))),
         )
             .andExpect(status().isOk)
             .andExpect(jsonPath("$.data.evidenceStorageKey").doesNotExist())
@@ -107,7 +113,7 @@ class SpendingControllerTest {
 
         mockMvc.perform(
             get("/api/v1/events/$EVENT_ID/spendings")
-                .header(SpendingController.USER_ID_HEADER, USER_ID),
+                .with(authentication(principalOf(USER_ID))),
         )
             .andExpect(status().isOk)
             .andExpect(jsonPath("$.data.content[0].spendingId").value(SPENDING_ID))
@@ -123,7 +129,7 @@ class SpendingControllerTest {
         mockMvc.perform(
             get("/api/v1/events/$EVENT_ID/spendings")
                 .param("status", "PENDING")
-                .header(SpendingController.USER_ID_HEADER, USER_ID),
+                .with(authentication(principalOf(USER_ID))),
         )
             .andExpect(status().isOk)
     }
@@ -136,7 +142,7 @@ class SpendingControllerTest {
 
         mockMvc.perform(
             patch("/api/v1/events/$EVENT_ID/spendings/$SPENDING_ID/approval")
-                .header(SpendingController.USER_ID_HEADER, OWNER_ID),
+                .with(authentication(principalOf(OWNER_ID))),
         )
             .andExpect(status().isOk)
             .andExpect(jsonPath("$.data.status").value("APPROVED"))
@@ -151,7 +157,7 @@ class SpendingControllerTest {
 
         mockMvc.perform(
             patch("/api/v1/events/$EVENT_ID/spendings/$SPENDING_ID/approval")
-                .header(SpendingController.USER_ID_HEADER, USER_ID),
+                .with(authentication(principalOf(USER_ID))),
         )
             .andExpect(status().isForbidden)
             .andExpect(jsonPath("$.success").value(false))
@@ -166,7 +172,7 @@ class SpendingControllerTest {
 
         mockMvc.perform(
             patch("/api/v1/events/$EVENT_ID/spendings/$SPENDING_ID/approval")
-                .header(SpendingController.USER_ID_HEADER, OWNER_ID),
+                .with(authentication(principalOf(OWNER_ID))),
         )
             .andExpect(status().isConflict)
             .andExpect(jsonPath("$.code").value("SPENDING_ALREADY_HANDLED"))
@@ -177,7 +183,7 @@ class SpendingControllerTest {
     fun rejectWithoutReason() {
         mockMvc.perform(
             patch("/api/v1/events/$EVENT_ID/spendings/$SPENDING_ID/rejection")
-                .header(SpendingController.USER_ID_HEADER, OWNER_ID)
+                .with(authentication(principalOf(OWNER_ID)))
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(objectMapper.writeValueAsString(RejectSpendingRequest(" "))),
         )
@@ -192,21 +198,12 @@ class SpendingControllerTest {
     fun createWithoutOtherDetail() {
         mockMvc.perform(
             post("/api/v1/events/$EVENT_ID/spendings")
-                .header(SpendingController.USER_ID_HEADER, USER_ID)
+                .with(authentication(principalOf(USER_ID)))
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(objectMapper.writeValueAsString(createRequest(tag = SpendingTag.OTHER))),
         )
             .andExpect(status().isBadRequest)
             .andExpect(jsonPath("$.code").value("INVALID_INPUT_VALUE"))
-    }
-
-    /** auth 완성 전까지 사용자 ID는 헤더로 받는다. 빠지면 400이어야 한다. 500이 아니라. */
-    @Test
-    @DisplayName("사용자 ID 헤더가 없으면 400을 반환한다")
-    fun missingUserIdHeader() {
-        mockMvc.perform(get("/api/v1/events/$EVENT_ID/spendings/$SPENDING_ID"))
-            .andExpect(status().isBadRequest)
-            .andExpect(jsonPath("$.code").value("MISSING_REQUEST_PARAMETER"))
     }
 
     private fun createRequest(tag: SpendingTag = SpendingTag.MEAL) = CreateSpendingRequest(
@@ -255,6 +252,43 @@ class SpendingControllerTest {
         status = SpendingStatus.PENDING,
         createdAt = LocalDateTime.of(2026, 8, 20, 12, 0),
     )
+
+    @Test
+    @DisplayName("토큰 없이 호출하면 401이다")
+    fun unauthenticated() {
+        // 예전에는 X-User-Id 헤더가 없으면 400이었다. 이제 사용자는 토큰에서만 나오므로,
+        // 헤더 누락이 아니라 인증 없음으로 판정된다.
+        mockMvc.perform(get("/api/v1/events/$EVENT_ID/spendings"))
+            .andExpect(status().isUnauthorized)
+            .andExpect(jsonPath("$.code").value("UNAUTHORIZED"))
+
+        verify(exactly = 0) { spendingService.getSpendings(any(), any(), any(), any()) }
+    }
+
+    /**
+     * 헤더로 사용자를 바꿔치기할 수 없어야 한다.
+     *
+     * 예전에는 이 헤더가 곧 사용자였다. 로그인만 하면 남의 이름으로 지출을 신청하고
+     * 남의 지출을 조회할 수 있었다. 값이 무시되는지 명시적으로 확인한다.
+     */
+    @Test
+    @DisplayName("X-User-Id 헤더로 다른 사용자를 흉내낼 수 없다")
+    fun headerCannotSpoofUser() {
+        every { spendingService.getSpendings(EVENT_ID, USER_ID, null, any()) } returns
+            PageImpl(listOf(listResponse()), PageRequest.of(0, 20), 1)
+
+        mockMvc.perform(
+            get("/api/v1/events/$EVENT_ID/spendings")
+                .with(authentication(principalOf(USER_ID)))
+                .header("X-User-Id", 999L),
+        ).andExpect(status().isOk)
+
+        verify(exactly = 0) { spendingService.getSpendings(EVENT_ID, 999L, any(), any()) }
+    }
+
+    /** 인증 필터가 심는 것과 같은 형태의 주체를 만든다. 주체는 사용자 ID다. */
+    private fun principalOf(userId: Long): Authentication =
+        UsernamePasswordAuthenticationToken(userId, null, emptyList())
 
     companion object {
         private const val EVENT_ID = 1L
