@@ -5,7 +5,9 @@ import com.moasem.backend.domain.event.service.port.ApprovedSpendingListProvider
 import com.moasem.backend.domain.event.service.port.ApprovedSpendingTotalProvider
 import com.moasem.backend.domain.event.service.port.PendingSpendingCountProvider
 import com.moasem.backend.domain.event.service.port.SpendingHistoryProvider
+import com.moasem.backend.domain.group.service.adapter.GroupMembershipAdapter
 import com.moasem.backend.domain.spending.service.port.EventAccessProvider
+import com.moasem.backend.domain.spending.service.port.GroupAccessProvider
 import org.assertj.core.api.Assertions.assertThat
 import org.junit.jupiter.api.DisplayName
 import org.junit.jupiter.api.Test
@@ -31,6 +33,7 @@ class SpendingPortWiringTest @Autowired constructor(
     private val pendingSpendingCountProvider: PendingSpendingCountProvider,
     private val spendingHistoryProvider: SpendingHistoryProvider,
     private val eventAccessProvider: EventAccessProvider,
+    private val groupAccessProvider: GroupAccessProvider,
 ) {
 
     @Test
@@ -46,6 +49,25 @@ class SpendingPortWiringTest @Autowired constructor(
     @DisplayName("행사 조회 port는 실제 어댑터가 주입된다")
     fun eventAccessUsesRealAdapter() {
         assertThat(eventAccessProvider).isInstanceOf(EventAccessAdapter::class.java)
+    }
+
+    @Test
+    @DisplayName("모임 권한 port는 스텁이 아니라 실제 어댑터가 주입된다")
+    fun groupAccessUsesRealAdapter() {
+        assertThat(groupAccessProvider).isInstanceOf(GroupMembershipAdapter::class.java)
+    }
+
+    /**
+     * 스텁이 살아 있었다면 아무나 구성원이고 아무나 모임장이었다.
+     *
+     * 예외가 나지 않고 권한만 통과되는 종류의 고장이라, 이 확인이 없으면 아무도 모른다.
+     * 실제로 모임에 속하지 않은 사용자가 지출을 신청할 수 있던 기간이 있었다(#112).
+     */
+    @Test
+    @DisplayName("없는 모임의 구성원·모임장은 아무도 없다")
+    fun missingGroupHasNoMemberOrOwner() {
+        assertThat(groupAccessProvider.isMember(999_999L, 1L)).isFalse()
+        assertThat(groupAccessProvider.isOwner(999_999L, 1L)).isFalse()
     }
 
     /** 스텁이 살아 있었다면 없는 행사에도 값을 돌려준다. 실제 어댑터는 null을 준다. */
