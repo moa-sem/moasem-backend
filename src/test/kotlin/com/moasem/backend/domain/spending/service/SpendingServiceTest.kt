@@ -12,6 +12,7 @@ import com.moasem.backend.domain.spending.repository.SpendingRepository
 import com.moasem.backend.domain.spending.service.port.EventAccess
 import com.moasem.backend.domain.spending.service.port.EventAccessProvider
 import com.moasem.backend.domain.spending.service.port.GroupAccessProvider
+import com.moasem.backend.domain.spending.service.port.UserNameProvider
 import com.moasem.backend.global.storage.FakePrivateFileStorage
 import com.moasem.backend.global.storage.FileUploadPolicy
 import com.moasem.backend.global.error.ErrorCode
@@ -36,11 +37,19 @@ class SpendingServiceTest {
     private val eventAccessProvider = mockk<EventAccessProvider>()
     private val groupAccessProvider = mockk<GroupAccessProvider>()
     private val fileStorage = FakePrivateFileStorage()
+    private val userNameProvider = mockk<UserNameProvider>()
     private lateinit var spendingService: SpendingService
 
     @BeforeEach
     fun setUp() {
-        spendingService = SpendingService(spendingRepository, eventAccessProvider, groupAccessProvider, fileStorage)
+        spendingService = SpendingService(
+            spendingRepository,
+            eventAccessProvider,
+            groupAccessProvider,
+            fileStorage,
+            userNameProvider,
+        )
+        every { userNameProvider.findNames(any()) } returns mapOf(MEMBER_ID to "김소담")
         every { eventAccessProvider.findAccess(EVENT_ID) } returns activeEvent()
         every { groupAccessProvider.isMember(GROUP_ID, MEMBER_ID) } returns true
     }
@@ -311,6 +320,39 @@ class SpendingServiceTest {
 
             assertThat(page.content).allSatisfy { assertThat(it.status).isEqualTo(SpendingStatus.APPROVED) }
             verify { spendingRepository.findAllByEventIdAndStatus(EVENT_ID, SpendingStatus.APPROVED, pageable) }
+        }
+
+        @Test
+        fun `목록 항목에는 신청자 이름이 함께 담긴다`() {
+            every { spendingRepository.findAllByEventId(EVENT_ID, pageable) } returns
+                PageImpl(listOf(savedSpending()), pageable, 1)
+
+            val page = spendingService.getSpendings(EVENT_ID, MEMBER_ID, null, pageable)
+
+            assertThat(page.content.single().applicantName).isEqualTo("김소담")
+        }
+
+        /** 한 페이지에 필요한 이름을 한 번에 모아 온다. 건별로 물어보면 지출 수만큼 조회가 나간다. */
+        @Test
+        fun `이름 조회는 목록당 한 번만 나간다`() {
+            every { spendingRepository.findAllByEventId(EVENT_ID, pageable) } returns
+                PageImpl(listOf(savedSpending(), savedSpending(), savedSpending()), pageable, 3)
+
+            spendingService.getSpendings(EVENT_ID, MEMBER_ID, null, pageable)
+
+            verify(exactly = 1) { userNameProvider.findNames(any()) }
+        }
+
+        /** 탈퇴한 사용자의 지출이 남아 있어도 목록 전체가 실패하면 안 된다. */
+        @Test
+        fun `이름을 찾을 수 없는 신청자는 대체 표기로 남는다`() {
+            every { spendingRepository.findAllByEventId(EVENT_ID, pageable) } returns
+                PageImpl(listOf(savedSpending()), pageable, 1)
+            every { userNameProvider.findNames(any()) } returns emptyMap()
+
+            val page = spendingService.getSpendings(EVENT_ID, MEMBER_ID, null, pageable)
+
+            assertThat(page.content.single().applicantName).isEqualTo("탈퇴한 사용자")
         }
 
         @Test
