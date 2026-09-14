@@ -21,6 +21,7 @@ import com.moasem.backend.global.security.SecurityConfig
 import com.ninjasquad.springmockk.MockkBean
 import io.mockk.every
 import io.mockk.verify
+import org.hamcrest.Matchers.nullValue
 import org.junit.jupiter.api.DisplayName
 import org.junit.jupiter.api.Test
 import org.springframework.beans.factory.annotation.Autowired
@@ -144,6 +145,10 @@ class EventControllerTest {
         mockMvc.perform(get(BASE_URL).with(authenticatedUser()))
             .andExpect(status().isOk)
             .andExpect(jsonPath("$.data[0].eventId").value(EVENT_ID))
+            .andExpect(jsonPath("$.data[0].initialBudget").value(500000))
+            .andExpect(jsonPath("$.data[0].totalBudget").value(600000))
+            .andExpect(jsonPath("$.data[0].remainingBudget").value(350000))
+            .andExpect(jsonPath("$.data[0].participantCount").value(nullValue()))
 
         verify(exactly = 1) { eventService.getEvents(GROUP_ID, USER_ID, null) }
     }
@@ -155,6 +160,9 @@ class EventControllerTest {
 
         mockMvc.perform(get(BASE_URL).param("status", "ACTIVE").with(authenticatedUser()))
             .andExpect(status().isOk)
+            .andExpect(jsonPath("$.data[0].totalBudget").value(600000))
+            .andExpect(jsonPath("$.data[0].remainingBudget").value(350000))
+            .andExpect(jsonPath("$.data[0].participantCount").value(nullValue()))
 
         verify(exactly = 1) { eventService.getEvents(GROUP_ID, USER_ID, EventStatus.ACTIVE) }
     }
@@ -163,11 +171,14 @@ class EventControllerTest {
     @DisplayName("CLOSED 상태 필터를 서비스에 전달한다")
     fun getClosedEvents() {
         every { eventService.getEvents(GROUP_ID, USER_ID, EventStatus.CLOSED) } returns
-            listOf(listResponse(status = EventStatus.CLOSED))
+            listOf(listResponse(status = EventStatus.CLOSED, participantCount = PARTICIPANT_COUNT))
 
         mockMvc.perform(get(BASE_URL).param("status", "CLOSED").with(authenticatedUser()))
             .andExpect(status().isOk)
             .andExpect(jsonPath("$.data[0].status").value("CLOSED"))
+            .andExpect(jsonPath("$.data[0].totalBudget").value(600000))
+            .andExpect(jsonPath("$.data[0].remainingBudget").value(350000))
+            .andExpect(jsonPath("$.data[0].participantCount").value(PARTICIPANT_COUNT))
     }
 
     @Test
@@ -505,13 +516,19 @@ class EventControllerTest {
         UsernamePasswordAuthenticationToken(USER_ID, null, emptyList()),
     )
 
-    private fun listResponse(status: EventStatus = EventStatus.ACTIVE) = EventListResponse(
+    private fun listResponse(
+        status: EventStatus = EventStatus.ACTIVE,
+        participantCount: Int? = null,
+    ) = EventListResponse(
         eventId = EVENT_ID,
         title = "여름 MT",
         startAt = START_AT,
         endAt = END_AT,
         status = status,
         initialBudget = 500_000L,
+        totalBudget = 600_000L,
+        remainingBudget = 350_000L,
+        participantCount = participantCount,
     )
 
     private fun detailResponse() = EventDetailResponse(

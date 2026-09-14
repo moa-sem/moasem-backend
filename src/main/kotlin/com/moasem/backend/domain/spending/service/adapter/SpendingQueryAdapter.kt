@@ -38,6 +38,15 @@ class SpendingQueryAdapter(
     override fun getApprovedSpendingTotal(eventId: Long): Long =
         spendingRepository.sumAmountByEventIdAndStatus(eventId, SpendingStatus.APPROVED)
 
+    override fun getApprovedSpendingTotals(eventIds: Collection<Long>): Map<Long, Long> {
+        if (eventIds.isEmpty()) return emptyMap()
+
+        val totals = spendingRepository
+            .sumAmountsByEventIdsAndStatus(eventIds, SpendingStatus.APPROVED)
+            .associate { it.eventId to it.totalAmount }
+        return eventIds.associateWith { totals[it] ?: 0L }
+    }
+
     /**
      * 결산 보고서용 승인 지출 내역. 합계와 같은 기준(APPROVED만)으로 고른다.
      *

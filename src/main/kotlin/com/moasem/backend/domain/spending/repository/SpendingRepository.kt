@@ -53,4 +53,23 @@ interface SpendingRepository : JpaRepository<Spending, Long> {
         @Param("eventId") eventId: Long,
         @Param("status") status: SpendingStatus,
     ): Long
+
+    @Query(
+        """
+        SELECT s.eventId AS eventId, SUM(s.amount) AS totalAmount
+        FROM Spending s
+        WHERE s.eventId IN :eventIds
+          AND s.status = :status
+        GROUP BY s.eventId
+        """,
+    )
+    fun sumAmountsByEventIdsAndStatus(
+        @Param("eventIds") eventIds: Collection<Long>,
+        @Param("status") status: SpendingStatus,
+    ): List<SpendingTotalSummary>
+}
+
+interface SpendingTotalSummary {
+    val eventId: Long
+    val totalAmount: Long
 }

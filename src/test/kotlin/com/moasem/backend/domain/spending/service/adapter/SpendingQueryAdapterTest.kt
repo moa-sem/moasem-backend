@@ -61,6 +61,28 @@ class SpendingQueryAdapterTest @Autowired constructor(
     }
 
     @Test
+    @DisplayName("여러 행사의 승인 지출만 행사별로 일괄 합산한다")
+    fun approvedTotalsCountApprovedOnlyByEvent() {
+        save(amount = 10_000L).also { it.approve(OWNER_ID) }
+        save(amount = 99_000L)
+        save(amount = 77_000L).also { it.reject(OWNER_ID, "증빙 누락") }
+        save(eventId = OTHER_EVENT_ID, amount = 50_000L).also { it.approve(OWNER_ID) }
+        spendingRepository.flush()
+
+        val totals = adapter.getApprovedSpendingTotals(listOf(EVENT_ID, OTHER_EVENT_ID, EMPTY_EVENT_ID))
+
+        assertThat(totals).containsExactlyInAnyOrderEntriesOf(
+            mapOf(EVENT_ID to 10_000L, OTHER_EVENT_ID to 50_000L, EMPTY_EVENT_ID to 0L),
+        )
+    }
+
+    @Test
+    @DisplayName("빈 행사 목록의 승인 지출 합계는 빈 결과다")
+    fun approvedTotalsAreEmptyForEmptyEventIds() {
+        assertThat(adapter.getApprovedSpendingTotals(emptyList())).isEmpty()
+    }
+
+    @Test
     @DisplayName("승인된 지출만 목록에 들어간다")
     fun approvedListContainsApprovedOnly() {
         val approved = save(amount = 10_000L).also { it.approve(OWNER_ID) }
