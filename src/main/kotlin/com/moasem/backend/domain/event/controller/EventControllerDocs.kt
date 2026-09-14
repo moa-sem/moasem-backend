@@ -33,7 +33,10 @@ interface EventControllerDocs {
         request: CreateEventRequest,
     ): ResponseEntity<ApiResponse<EventDetailResponse>>
 
-    @Operation(summary = "행사 목록 조회", description = "모임의 미삭제 행사를 조회한다. 상태를 생략하면 전체를 반환한다.")
+    @Operation(
+        summary = "행사 목록 조회",
+        description = "모임의 미삭제 행사와 총예산·잔여 예산·마감 참여 인원을 조회한다. 상태를 생략하면 전체를 반환한다.",
+    )
     @ApiResponses(
         SwaggerResponse(responseCode = "200", description = "조회 성공"),
         SwaggerResponse(responseCode = "400", description = "잘못된 상태 값 또는 입력값 오류"),

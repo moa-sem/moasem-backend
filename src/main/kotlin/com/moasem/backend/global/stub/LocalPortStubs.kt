@@ -47,6 +47,7 @@ class LocalPortStubs {
     @ConditionalOnMissingBean(ApprovedSpendingTotalProvider::class)
     fun stubApprovedSpendingTotalProvider() = object : ApprovedSpendingTotalProvider {
         override fun getApprovedSpendingTotal(eventId: Long) = 0L
+        override fun getApprovedSpendingTotals(eventIds: Collection<Long>) = eventIds.associateWith { 0L }
     }
 
     @Bean

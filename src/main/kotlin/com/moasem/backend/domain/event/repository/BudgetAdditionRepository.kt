@@ -12,4 +12,19 @@ interface BudgetAdditionRepository : JpaRepository<BudgetAddition, Long> {
 
     @Query("SELECT COALESCE(SUM(b.amount), 0) FROM BudgetAddition b WHERE b.eventId = :eventId")
     fun sumAmountByEventId(@Param("eventId") eventId: Long): Long
+
+    @Query(
+        """
+        SELECT b.eventId AS eventId, SUM(b.amount) AS totalAmount
+        FROM BudgetAddition b
+        WHERE b.eventId IN :eventIds
+        GROUP BY b.eventId
+        """,
+    )
+    fun sumAmountsByEventIds(@Param("eventIds") eventIds: Collection<Long>): List<BudgetAdditionTotalSummary>
+}
+
+interface BudgetAdditionTotalSummary {
+    val eventId: Long
+    val totalAmount: Long
 }

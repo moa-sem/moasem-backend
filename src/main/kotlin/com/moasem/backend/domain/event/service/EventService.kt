@@ -5,8 +5,8 @@ import com.moasem.backend.domain.event.dto.EventDetailResponse
 import com.moasem.backend.domain.event.dto.EventListResponse
 import com.moasem.backend.domain.event.entity.Event
 import com.moasem.backend.domain.event.entity.EventStatus
-import com.moasem.backend.domain.event.repository.EventRepository
 import com.moasem.backend.domain.event.repository.BudgetAdditionRepository
+import com.moasem.backend.domain.event.repository.EventRepository
 import com.moasem.backend.domain.event.service.port.ApprovedSpendingTotalProvider
 import com.moasem.backend.domain.event.service.port.GroupAccessProvider
 import com.moasem.backend.global.error.BusinessException
@@ -50,7 +50,24 @@ class EventService(
         } else {
             eventRepository.findAllByGroupIdAndStatusAndDeletedAtIsNullOrderByStartAtDesc(groupId, status)
         }
-        return events.map(EventListResponse::from)
+        if (events.isEmpty()) return emptyList()
+
+        val eventIds = events.map { event ->
+            event.id ?: error("저장되지 않은 행사는 조회할 수 없습니다.")
+        }
+        val additionalBudgets = budgetAdditionRepository
+            .sumAmountsByEventIds(eventIds)
+            .associate { it.eventId to it.totalAmount }
+        val approvedSpendings = approvedSpendingTotalProvider.getApprovedSpendingTotals(eventIds)
+
+        return events.map { event ->
+            val eventId = checkNotNull(event.id)
+            EventListResponse.from(
+                event = event,
+                additionalBudget = additionalBudgets[eventId] ?: 0L,
+                approvedSpending = approvedSpendings[eventId] ?: 0L,
+            )
+        }
     }
 
     @Transactional(readOnly = true)
