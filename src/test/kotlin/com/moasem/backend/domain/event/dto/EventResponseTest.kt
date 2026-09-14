@@ -10,8 +10,8 @@ import java.time.LocalDateTime
 class EventResponseTest {
 
     @Test
-    fun `목록 응답 팩토리는 기존 필드를 동일하게 변환한다`() {
-        val response = EventListResponse.from(event(EVENT_ID))
+    fun `목록 응답 팩토리는 기존 필드와 예산 요약을 변환한다`() {
+        val response = EventListResponse.from(event(EVENT_ID), 150_000L, 320_000L)
 
         assertThat(response).isEqualTo(
             EventListResponse(
@@ -21,10 +21,34 @@ class EventResponseTest {
                 endAt = END_AT,
                 status = EventStatus.ACTIVE,
                 initialBudget = INITIAL_BUDGET,
+                totalBudget = 650_000L,
+                remainingBudget = 330_000L,
+                participantCount = null,
             ),
         )
         assertThat(EventListResponse::class.members.map { it.name })
-            .doesNotContain("description", "additionalBudget", "totalBudget", "approvedSpending", "remainingBudget")
+            .contains("eventId", "title", "startAt", "endAt", "status", "initialBudget")
+            .contains("totalBudget", "remainingBudget", "participantCount")
+            .doesNotContain("description", "additionalBudget", "approvedSpending")
+    }
+
+    @Test
+    fun `목록 응답은 0원과 음수 잔여 예산을 그대로 반환한다`() {
+        val event = event(EVENT_ID)
+
+        assertThat(EventListResponse.from(event, 0L, INITIAL_BUDGET).remainingBudget).isZero()
+        assertThat(EventListResponse.from(event, 0L, INITIAL_BUDGET + 50_000L).remainingBudget)
+            .isEqualTo(-50_000L)
+    }
+
+    @Test
+    fun `마감 행사는 저장된 참여 인원을 반환한다`() {
+        val event = event(EVENT_ID).also { it.close(PARTICIPANT_COUNT) }
+
+        val response = EventListResponse.from(event, 0L, 0L)
+
+        assertThat(response.status).isEqualTo(EventStatus.CLOSED)
+        assertThat(response.participantCount).isEqualTo(PARTICIPANT_COUNT)
     }
 
     @Test
@@ -51,7 +75,7 @@ class EventResponseTest {
 
     @Test
     fun `저장되지 않은 행사는 목록 응답으로 변환할 수 없다`() {
-        assertThatThrownBy { EventListResponse.from(event()) }
+        assertThatThrownBy { EventListResponse.from(event(), 0L, 0L) }
             .isInstanceOf(IllegalStateException::class.java)
             .hasMessage("저장되지 않은 행사는 응답으로 변환할 수 없습니다.")
     }
@@ -84,6 +108,7 @@ class EventResponseTest {
         private const val TITLE = "여름 MT"
         private const val DESCRIPTION = "2박 3일 행사"
         private const val INITIAL_BUDGET = 500_000L
+        private const val PARTICIPANT_COUNT = 12
         private val START_AT = LocalDateTime.of(2026, 8, 28, 10, 0)
         private val END_AT = LocalDateTime.of(2026, 8, 30, 12, 0)
     }

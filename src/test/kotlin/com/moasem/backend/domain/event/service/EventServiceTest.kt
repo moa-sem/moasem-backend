@@ -4,8 +4,9 @@ import com.moasem.backend.domain.event.dto.CreateEventRequest
 import com.moasem.backend.domain.event.dto.EventListResponse
 import com.moasem.backend.domain.event.entity.Event
 import com.moasem.backend.domain.event.entity.EventStatus
-import com.moasem.backend.domain.event.repository.EventRepository
 import com.moasem.backend.domain.event.repository.BudgetAdditionRepository
+import com.moasem.backend.domain.event.repository.BudgetAdditionTotalSummary
+import com.moasem.backend.domain.event.repository.EventRepository
 import com.moasem.backend.domain.event.service.port.GroupAccessProvider
 import com.moasem.backend.domain.event.service.port.ApprovedSpendingTotalProvider
 import com.moasem.backend.global.error.ErrorCode
@@ -43,6 +44,8 @@ class EventServiceTest {
         every { groupAccessProvider.isOwner(GROUP_ID, OWNER_ID) } returns true
         every { budgetAdditionRepository.sumAmountByEventId(EVENT_ID) } returns 0L
         every { approvedSpendingTotalProvider.getApprovedSpendingTotal(EVENT_ID) } returns 0L
+        every { budgetAdditionRepository.sumAmountsByEventIds(any()) } returns emptyList()
+        every { approvedSpendingTotalProvider.getApprovedSpendingTotals(any()) } returns emptyMap()
     }
 
     @Nested
@@ -194,6 +197,9 @@ class EventServiceTest {
             val responses = eventService.getEvents(GROUP_ID, OWNER_ID)
 
             assertThat(responses.map { it.eventId }).containsExactly(EVENT_ID)
+            assertThat(responses.single().totalBudget).isEqualTo(500_000L)
+            assertThat(responses.single().remainingBudget).isEqualTo(500_000L)
+            assertThat(responses.single().participantCount).isNull()
             verify { eventRepository.findAllByGroupIdAndDeletedAtIsNullOrderByStartAtDesc(GROUP_ID) }
         }
 
@@ -204,11 +210,12 @@ class EventServiceTest {
                     GROUP_ID,
                     EventStatus.CLOSED,
                 )
-            } returns listOf(event(EVENT_ID, EventStatus.CLOSED))
+            } returns listOf(event(EVENT_ID, EventStatus.CLOSED, PARTICIPANT_COUNT))
 
             val responses = eventService.getEvents(GROUP_ID, OWNER_ID, EventStatus.CLOSED)
 
             assertThat(responses).allSatisfy { assertThat(it.status).isEqualTo(EventStatus.CLOSED) }
+            assertThat(responses.single().participantCount).isEqualTo(PARTICIPANT_COUNT)
             verify {
                 eventRepository.findAllByGroupIdAndStatusAndDeletedAtIsNullOrderByStartAtDesc(
                     GROUP_ID,
@@ -218,10 +225,57 @@ class EventServiceTest {
         }
 
         @Test
-        fun `목록 응답에는 승인 지출과 잔여 예산 필드가 없다`() {
-            val fields = EventListResponse::class.members.map { it.name }
+        fun `추가 예산과 승인 지출을 일괄 조회해 목록 예산을 계산한다`() {
+            val secondEventId = OTHER_EVENT_ID
+            every {
+                eventRepository.findAllByGroupIdAndDeletedAtIsNullOrderByStartAtDesc(GROUP_ID)
+            } returns listOf(event(EVENT_ID), event(secondEventId))
+            every { budgetAdditionRepository.sumAmountsByEventIds(listOf(EVENT_ID, secondEventId)) } returns listOf(
+                budgetSummary(EVENT_ID, 150_000L),
+            )
+            every {
+                approvedSpendingTotalProvider.getApprovedSpendingTotals(listOf(EVENT_ID, secondEventId))
+            } returns mapOf(EVENT_ID to 320_000L, secondEventId to 550_000L)
 
-            assertThat(fields).doesNotContain("approvedSpending", "remainingBudget")
+            val responses = eventService.getEvents(GROUP_ID, OWNER_ID)
+
+            assertThat(responses[0].totalBudget).isEqualTo(650_000L)
+            assertThat(responses[0].remainingBudget).isEqualTo(330_000L)
+            assertThat(responses[1].totalBudget).isEqualTo(500_000L)
+            assertThat(responses[1].remainingBudget).isEqualTo(-50_000L)
+            verify(exactly = 1) { budgetAdditionRepository.sumAmountsByEventIds(listOf(EVENT_ID, secondEventId)) }
+            verify(exactly = 1) {
+                approvedSpendingTotalProvider.getApprovedSpendingTotals(listOf(EVENT_ID, secondEventId))
+            }
+        }
+
+        @Test
+        fun `승인 지출이 총예산과 같으면 목록 잔여 예산은 0원이다`() {
+            every {
+                eventRepository.findAllByGroupIdAndStatusAndDeletedAtIsNullOrderByStartAtDesc(
+                    GROUP_ID,
+                    EventStatus.ACTIVE,
+                )
+            } returns listOf(event(EVENT_ID))
+            every { approvedSpendingTotalProvider.getApprovedSpendingTotals(listOf(EVENT_ID)) } returns
+                mapOf(EVENT_ID to 500_000L)
+
+            val response = eventService.getEvents(GROUP_ID, OWNER_ID, EventStatus.ACTIVE).single()
+
+            assertThat(response.remainingBudget).isZero()
+            assertThat(response.participantCount).isNull()
+        }
+
+        @Test
+        fun `행사가 없으면 예산 집계를 조회하지 않는다`() {
+            every {
+                eventRepository.findAllByGroupIdAndDeletedAtIsNullOrderByStartAtDesc(GROUP_ID)
+            } returns emptyList()
+
+            assertThat(eventService.getEvents(GROUP_ID, OWNER_ID)).isEmpty()
+
+            verify(exactly = 0) { budgetAdditionRepository.sumAmountsByEventIds(any()) }
+            verify(exactly = 0) { approvedSpendingTotalProvider.getApprovedSpendingTotals(any()) }
         }
     }
 
@@ -349,7 +403,11 @@ class EventServiceTest {
         initialBudget = initialBudget,
     )
 
-    private fun event(id: Long, status: EventStatus = EventStatus.ACTIVE): Event =
+    private fun event(
+        id: Long,
+        status: EventStatus = EventStatus.ACTIVE,
+        participantCount: Int = PARTICIPANT_COUNT,
+    ): Event =
         Event.create(
             GROUP_ID,
             "여름 MT",
@@ -361,11 +419,15 @@ class EventServiceTest {
             .also { event ->
                 assignId(event, id)
                 if (status == EventStatus.CLOSED) {
-                    val statusField = Event::class.java.getDeclaredField("status")
-                    statusField.isAccessible = true
-                    statusField.set(event, status)
+                    event.close(participantCount)
                 }
             }
+
+    private fun budgetSummary(eventId: Long, totalAmount: Long): BudgetAdditionTotalSummary =
+        object : BudgetAdditionTotalSummary {
+            override val eventId = eventId
+            override val totalAmount = totalAmount
+        }
 
     private fun saveEvent(): io.mockk.CapturingSlot<Event> {
         val savedEvent = slot<Event>()
@@ -386,5 +448,7 @@ class EventServiceTest {
         private const val GROUP_ID = 1L
         private const val OWNER_ID = 10L
         private const val EVENT_ID = 100L
+        private const val OTHER_EVENT_ID = 101L
+        private const val PARTICIPANT_COUNT = 12
     }
 }
