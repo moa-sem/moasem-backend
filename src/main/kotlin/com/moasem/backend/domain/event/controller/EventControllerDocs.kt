@@ -97,7 +97,7 @@ interface EventControllerDocs {
 
     @Operation(
         summary = "행사 마감 미리보기",
-        description = "행사 상태를 변경하지 않고 마감 조건과 현재 예산 현황을 확인한다.",
+        description = "행사 상태를 변경하지 않고 마감 조건과 현재 예산, 참여 인원 기준 반환·추가 부담 참고액을 확인한다.",
     )
     @ApiResponses(
         SwaggerResponse(responseCode = "200", description = "미리보기 조회 성공"),
@@ -118,7 +118,7 @@ interface EventControllerDocs {
 
     @Operation(
         summary = "행사 마감 확정",
-        description = "마감 조건을 다시 검증하고 행사를 CLOSED 상태로 변경한 뒤 보고서 생성을 요청한다.",
+        description = "마감 조건을 다시 검증하고 행사를 CLOSED 상태로 변경한다. 참여 인원 기준 반환·추가 부담 참고액을 함께 반환하고 보고서 생성을 요청한다.",
     )
     @ApiResponses(
         SwaggerResponse(responseCode = "200", description = "마감 성공"),

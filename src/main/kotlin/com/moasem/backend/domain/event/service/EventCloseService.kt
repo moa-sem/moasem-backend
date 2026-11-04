@@ -2,7 +2,9 @@ package com.moasem.backend.domain.event.service
 
 import com.moasem.backend.domain.event.dto.EventCloseResponse
 import com.moasem.backend.domain.event.entity.EventStatus
+import com.moasem.backend.domain.event.repository.BudgetAdditionRepository
 import com.moasem.backend.domain.event.repository.EventRepository
+import com.moasem.backend.domain.event.service.port.ApprovedSpendingTotalProvider
 import com.moasem.backend.domain.event.service.port.GroupAccessProvider
 import com.moasem.backend.domain.event.service.port.PendingSpendingCountProvider
 import com.moasem.backend.domain.event.service.port.ReportGenerationRequester
@@ -20,6 +22,9 @@ class EventCloseService(
     private val groupAccessProvider: GroupAccessProvider,
     private val pendingSpendingCountProvider: PendingSpendingCountProvider,
     private val reportGenerationRequester: ReportGenerationRequester,
+    private val budgetAdditionRepository: BudgetAdditionRepository,
+    private val approvedSpendingTotalProvider: ApprovedSpendingTotalProvider,
+    private val eventCloseDistributionCalculator: EventCloseDistributionCalculator,
 ) {
 
     private val log = LoggerFactory.getLogger(javaClass)
@@ -45,6 +50,11 @@ class EventCloseService(
             throw BusinessException(ErrorCode.EVENT_HAS_PENDING_SPENDING)
         }
 
+        val additionalBudget = budgetAdditionRepository.sumAmountByEventId(persistedEventId)
+        val approvedSpending = approvedSpendingTotalProvider.getApprovedSpendingTotal(persistedEventId)
+        val totalBudget = event.initialBudget + additionalBudget
+        val distribution = eventCloseDistributionCalculator.calculate(totalBudget, approvedSpending, participantCount)
+
         event.close(participantCount)
         requestReportGenerationAfterCommit(persistedEventId)
 
@@ -53,6 +63,10 @@ class EventCloseService(
             status = event.status,
             participantCount = checkNotNull(event.participantCount),
             closedAt = checkNotNull(event.closedAt),
+            refundPerPerson = distribution.refundPerPerson,
+            refundRemainder = distribution.refundRemainder,
+            additionalChargePerPerson = distribution.additionalChargePerPerson,
+            overCollectedAmount = distribution.overCollectedAmount,
         )
     }
 
