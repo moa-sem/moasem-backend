@@ -50,6 +50,7 @@ enum class ErrorCode(val status: HttpStatus, val message: String) {
     SPENDING_ALREADY_HANDLED(HttpStatus.CONFLICT, "이미 처리된 지출입니다."),
     NOT_SPENDING_APPLICANT(HttpStatus.FORBIDDEN, "본인이 신청한 지출만 수정할 수 있습니다."),
     INVALID_EVIDENCE_KEY(HttpStatus.FORBIDDEN, "본인이 발급받은 증빙 저장 키가 아닙니다."),
+    EVIDENCE_FILE_NOT_FOUND(HttpStatus.NOT_FOUND, "업로드된 증빙 파일을 찾을 수 없습니다."),
 
     // 보고서
     REPORT_NOT_FOUND(HttpStatus.NOT_FOUND, "보고서를 찾을 수 없습니다."),

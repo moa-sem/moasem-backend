@@ -45,7 +45,7 @@ class LocalPrivateFileStorage(
     }
 
     /** 저장된 파일을 읽는다. 없으면 null. */
-    fun read(key: String): ByteArray? = resolve(key).takeIf { Files.isRegularFile(it) }?.let(Files::readAllBytes)
+    override fun read(key: String): ByteArray? = resolve(key).takeIf { Files.isRegularFile(it) }?.let(Files::readAllBytes)
 
     /**
      * key를 실제 경로로 바꾼다.

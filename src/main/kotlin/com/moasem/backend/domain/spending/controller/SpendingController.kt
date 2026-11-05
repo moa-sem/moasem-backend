@@ -4,6 +4,8 @@ import com.moasem.backend.domain.spending.dto.CreateSpendingRequest
 import com.moasem.backend.domain.spending.dto.EvidenceDownloadUrlResponse
 import com.moasem.backend.domain.spending.dto.EvidenceUploadUrlRequest
 import com.moasem.backend.domain.spending.dto.EvidenceUploadUrlResponse
+import com.moasem.backend.domain.spending.dto.ReceiptOcrRequest
+import com.moasem.backend.domain.spending.dto.ReceiptOcrResponse
 import com.moasem.backend.domain.spending.dto.RejectSpendingRequest
 import com.moasem.backend.domain.spending.dto.SpendingDetailResponse
 import com.moasem.backend.domain.spending.dto.SpendingListResponse
@@ -53,6 +55,14 @@ class SpendingController(
         @Valid @RequestBody request: EvidenceUploadUrlRequest,
     ): ApiResponse<EvidenceUploadUrlResponse> =
         ApiResponse.success(spendingService.issueEvidenceUploadUrl(eventId, currentUserId, request))
+
+    @PostMapping("/receipt-ocr")
+    override fun recognizeReceipt(
+        @PathVariable eventId: Long,
+        @AuthenticationPrincipal currentUserId: Long,
+        @Valid @RequestBody request: ReceiptOcrRequest,
+    ): ApiResponse<ReceiptOcrResponse> =
+        ApiResponse.success(spendingService.recognizeReceipt(eventId, currentUserId, request))
 
     /** 리소스를 만드는 요청이라 201과 Location을 돌려준다. */
     @PostMapping

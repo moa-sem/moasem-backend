@@ -4,6 +4,8 @@ import com.moasem.backend.domain.spending.dto.CreateSpendingRequest
 import com.moasem.backend.domain.spending.dto.EvidenceUploadUrlRequest
 import com.moasem.backend.domain.spending.dto.EvidenceUploadUrlResponse
 import com.moasem.backend.domain.spending.dto.EvidenceDownloadUrlResponse
+import com.moasem.backend.domain.spending.dto.ReceiptOcrRequest
+import com.moasem.backend.domain.spending.dto.ReceiptOcrResponse
 import com.moasem.backend.domain.spending.dto.SpendingDetailResponse
 import com.moasem.backend.domain.spending.dto.SpendingListResponse
 import com.moasem.backend.domain.spending.dto.UpdateSpendingRequest
@@ -13,11 +15,14 @@ import com.moasem.backend.domain.spending.repository.SpendingRepository
 import com.moasem.backend.domain.spending.service.port.EventAccess
 import com.moasem.backend.domain.spending.service.port.EventAccessProvider
 import com.moasem.backend.domain.spending.service.port.GroupAccessProvider
+import com.moasem.backend.domain.spending.service.port.ReceiptOcrClient
+import com.moasem.backend.domain.spending.service.port.ReceiptOcrResult
 import com.moasem.backend.domain.spending.service.port.UserNameProvider
 import com.moasem.backend.global.error.BusinessException
 import com.moasem.backend.global.error.ErrorCode
 import com.moasem.backend.global.storage.FileUploadPolicy
 import com.moasem.backend.global.storage.PrivateFileStorage
+import org.slf4j.LoggerFactory
 import org.springframework.data.domain.Page
 import org.springframework.data.domain.Pageable
 import org.springframework.stereotype.Service
@@ -33,7 +38,10 @@ class SpendingService(
     private val groupAccessProvider: GroupAccessProvider,
     private val privateFileStorage: PrivateFileStorage,
     private val userNameProvider: UserNameProvider,
+    private val receiptOcrClient: ReceiptOcrClient,
 ) {
+
+    private val log = LoggerFactory.getLogger(javaClass)
 
     /**
      * 증빙 이미지를 올릴 presigned URL을 발급한다.
@@ -63,6 +71,34 @@ class SpendingService(
             storageKey = storageKey,
             expiresAt = LocalDateTime.now().plus(UPLOAD_URL_EXPIRY),
         )
+    }
+
+    /**
+     * 업로드된 영수증을 읽어 신청 폼에 채울 값을 돌려준다. 결과는 저장하지 않는다.
+     *
+     * 인식 실패는 오류로 내보내지 않고 빈 결과를 준다. 입력을 돕는 기능일 뿐이라
+     * 사용자는 직접 채우면 된다. 업로드가 덜 끝나 파일이 없는 경우만 오류로 알린다.
+     *
+     * 트랜잭션을 걸지 않는다. 외부 API를 기다리는 동안 DB 커넥션을 붙잡지 않기 위해서다.
+     */
+    fun recognizeReceipt(
+        eventId: Long,
+        currentUserId: Long,
+        request: ReceiptOcrRequest,
+    ): ReceiptOcrResponse {
+        validateApplicable(eventId, currentUserId)
+        validateEvidenceKeyOwnership(request.storageKey, eventId, currentUserId)
+
+        val image = privateFileStorage.read(request.storageKey)
+            ?: throw BusinessException(ErrorCode.EVIDENCE_FILE_NOT_FOUND)
+
+        val result = try {
+            receiptOcrClient.recognize(image, mimeTypeOf(request.storageKey))
+        } catch (e: Exception) {
+            log.warn("영수증 인식 실패. eventId={} key={}", eventId, request.storageKey, e)
+            ReceiptOcrResult.EMPTY
+        }
+        return ReceiptOcrResponse.from(result)
     }
 
     /** 지출을 신청한다. 항상 PENDING으로 시작하며 모임장이 처리하기 전까지 예산에 반영되지 않는다. */
@@ -219,9 +255,10 @@ class SpendingService(
      * 신청에 실린 저장 키가 본인이 이 행사에서 발급받은 것인지 확인한다.
      *
      * 저장 키는 클라이언트가 보내는 값이므로 그대로 믿으면 남의 증빙을 자기 신청에 붙일 수 있다.
+     * 접두사만 보면 `../`로 다른 사람의 경로를 가리킬 수 있어 상위 경로 표기도 막는다.
      */
     private fun validateEvidenceKeyOwnership(storageKey: String, eventId: Long, userId: Long) {
-        if (!storageKey.startsWith(evidenceKeyPrefix(eventId, userId))) {
+        if (!storageKey.startsWith(evidenceKeyPrefix(eventId, userId)) || ".." in storageKey) {
             throw BusinessException(
                 ErrorCode.INVALID_EVIDENCE_KEY,
                 "본인이 이 행사에서 발급받은 증빙 저장 키만 사용할 수 있습니다.",
@@ -233,6 +270,10 @@ class SpendingService(
         "${evidenceKeyPrefix(eventId, userId)}${UUID.randomUUID()}.${extensionOf(mimeType)}"
 
     private fun evidenceKeyPrefix(eventId: Long, userId: Long): String = "spendings/$eventId/$userId/"
+
+    /** 저장 키는 항상 [buildEvidenceKey]가 만든 jpg·png다. */
+    private fun mimeTypeOf(storageKey: String): String =
+        if (storageKey.endsWith(".png")) "image/png" else "image/jpeg"
 
     private fun extensionOf(mimeType: String): String = when (mimeType) {
         "image/jpeg" -> "jpg"

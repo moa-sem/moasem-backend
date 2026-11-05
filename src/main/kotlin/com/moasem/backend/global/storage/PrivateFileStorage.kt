@@ -27,4 +27,12 @@ interface PrivateFileStorage {
 
     /** 지정한 키의 파일을 내려받을 수 있는 URL을 발급한다. */
     fun issueDownloadUrl(key: String, expiry: Duration): String
+
+    /**
+     * 파일 내용을 서버가 직접 읽는다. 없으면 null.
+     *
+     * presigned URL로 충분하지 않을 때만 쓴다. 영수증 인식처럼 서버가 내용을 외부 API에
+     * 넘겨야 하는 경우다. URL 발급과 마찬가지로 권한 검증을 먼저 끝낸 키만 넘긴다.
+     */
+    fun read(key: String): ByteArray?
 }
