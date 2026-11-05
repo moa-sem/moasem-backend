@@ -19,6 +19,7 @@ class EventClosePreviewService(
     private val groupAccessProvider: GroupAccessProvider,
     private val pendingSpendingCountProvider: PendingSpendingCountProvider,
     private val approvedSpendingTotalProvider: ApprovedSpendingTotalProvider,
+    private val eventCloseDistributionCalculator: EventCloseDistributionCalculator,
 ) {
 
     @Transactional(readOnly = true)
@@ -44,6 +45,7 @@ class EventClosePreviewService(
         val additionalBudget = budgetAdditionRepository.sumAmountByEventId(persistedEventId)
         val approvedSpending = approvedSpendingTotalProvider.getApprovedSpendingTotal(persistedEventId)
         val totalBudget = event.initialBudget + additionalBudget
+        val distribution = eventCloseDistributionCalculator.calculate(totalBudget, approvedSpending, participantCount)
 
         return EventClosePreviewResponse(
             eventId = persistedEventId,
@@ -55,7 +57,11 @@ class EventClosePreviewService(
             additionalBudget = additionalBudget,
             totalBudget = totalBudget,
             approvedSpending = approvedSpending,
-            remainingBudget = totalBudget - approvedSpending,
+            remainingBudget = distribution.remainingBudget,
+            refundPerPerson = distribution.refundPerPerson,
+            refundRemainder = distribution.refundRemainder,
+            additionalChargePerPerson = distribution.additionalChargePerPerson,
+            overCollectedAmount = distribution.overCollectedAmount,
         )
     }
 

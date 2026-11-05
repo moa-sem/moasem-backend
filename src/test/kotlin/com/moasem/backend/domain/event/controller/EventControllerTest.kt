@@ -357,6 +357,10 @@ class EventControllerTest {
             .andExpect(jsonPath("$.data.totalBudget").value(600000))
             .andExpect(jsonPath("$.data.approvedSpending").value(250000))
             .andExpect(jsonPath("$.data.remainingBudget").value(350000))
+            .andExpect(jsonPath("$.data.refundPerPerson").value(29166))
+            .andExpect(jsonPath("$.data.refundRemainder").value(8))
+            .andExpect(jsonPath("$.data.additionalChargePerPerson").value(0))
+            .andExpect(jsonPath("$.data.overCollectedAmount").value(0))
 
         verify(exactly = 1) {
             eventClosePreviewService.previewClose(GROUP_ID, EVENT_ID, USER_ID, PARTICIPANT_COUNT)
@@ -421,6 +425,10 @@ class EventControllerTest {
             .andExpect(jsonPath("$.data.status").value("CLOSED"))
             .andExpect(jsonPath("$.data.participantCount").value(PARTICIPANT_COUNT))
             .andExpect(jsonPath("$.data.closedAt").value("2026-09-12T13:00:00"))
+            .andExpect(jsonPath("$.data.refundPerPerson").value(29166))
+            .andExpect(jsonPath("$.data.refundRemainder").value(8))
+            .andExpect(jsonPath("$.data.additionalChargePerPerson").value(0))
+            .andExpect(jsonPath("$.data.overCollectedAmount").value(0))
 
         verify(exactly = 1) {
             eventCloseService.closeEvent(GROUP_ID, EVENT_ID, USER_ID, PARTICIPANT_COUNT)
@@ -557,6 +565,10 @@ class EventControllerTest {
         totalBudget = 600_000L,
         approvedSpending = 250_000L,
         remainingBudget = 350_000L,
+        refundPerPerson = 29_166L,
+        refundRemainder = 8L,
+        additionalChargePerPerson = 0L,
+        overCollectedAmount = 0L,
     )
 
     private fun closeResponse() = EventCloseResponse(
@@ -564,6 +576,10 @@ class EventControllerTest {
         status = EventStatus.CLOSED,
         participantCount = PARTICIPANT_COUNT,
         closedAt = LocalDateTime.of(2026, 9, 12, 13, 0),
+        refundPerPerson = 29_166L,
+        refundRemainder = 8L,
+        additionalChargePerPerson = 0L,
+        overCollectedAmount = 0L,
     )
 
     companion object {

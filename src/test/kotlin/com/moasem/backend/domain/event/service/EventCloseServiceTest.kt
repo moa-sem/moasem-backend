@@ -2,7 +2,9 @@ package com.moasem.backend.domain.event.service
 
 import com.moasem.backend.domain.event.entity.Event
 import com.moasem.backend.domain.event.entity.EventStatus
+import com.moasem.backend.domain.event.repository.BudgetAdditionRepository
 import com.moasem.backend.domain.event.repository.EventRepository
+import com.moasem.backend.domain.event.service.port.ApprovedSpendingTotalProvider
 import com.moasem.backend.domain.event.service.port.GroupAccessProvider
 import com.moasem.backend.domain.event.service.port.PendingSpendingCountProvider
 import com.moasem.backend.domain.event.service.port.ReportGenerationRequester
@@ -29,6 +31,8 @@ class EventCloseServiceTest {
     private val groupAccessProvider = mockk<GroupAccessProvider>()
     private val pendingSpendingCountProvider = mockk<PendingSpendingCountProvider>()
     private val reportGenerationRequester = mockk<ReportGenerationRequester>()
+    private val budgetAdditionRepository = mockk<BudgetAdditionRepository>()
+    private val approvedSpendingTotalProvider = mockk<ApprovedSpendingTotalProvider>()
     private lateinit var eventCloseService: EventCloseService
 
     @BeforeEach
@@ -38,6 +42,9 @@ class EventCloseServiceTest {
             groupAccessProvider,
             pendingSpendingCountProvider,
             reportGenerationRequester,
+            budgetAdditionRepository,
+            approvedSpendingTotalProvider,
+            EventCloseDistributionCalculator(),
         )
         TransactionSynchronizationManager.initSynchronization()
         every { groupAccessProvider.existsGroup(GROUP_ID) } returns true
@@ -48,6 +55,8 @@ class EventCloseServiceTest {
         } returns event(EVENT_ID)
         every { pendingSpendingCountProvider.getPendingSpendingCount(EVENT_ID) } returns 0L
         every { reportGenerationRequester.requestReportGeneration(EVENT_ID) } returns Unit
+        every { budgetAdditionRepository.sumAmountByEventId(EVENT_ID) } returns 0L
+        every { approvedSpendingTotalProvider.getApprovedSpendingTotal(EVENT_ID) } returns 0L
     }
 
     @AfterEach
@@ -69,12 +78,18 @@ class EventCloseServiceTest {
             assertThat(response.status).isEqualTo(EventStatus.CLOSED)
             assertThat(response.participantCount).isEqualTo(PARTICIPANT_COUNT)
             assertThat(response.closedAt).isNotNull()
+            assertThat(response.refundPerPerson).isEqualTo(166_666L)
+            assertThat(response.refundRemainder).isEqualTo(2L)
+            assertThat(response.additionalChargePerPerson).isZero()
+            assertThat(response.overCollectedAmount).isZero()
             verifyOrder {
                 groupAccessProvider.existsGroup(GROUP_ID)
                 groupAccessProvider.isMember(GROUP_ID, OWNER_ID)
                 groupAccessProvider.isOwner(GROUP_ID, OWNER_ID)
                 eventRepository.findByIdAndGroupIdAndDeletedAtIsNullForUpdate(EVENT_ID, GROUP_ID)
                 pendingSpendingCountProvider.getPendingSpendingCount(EVENT_ID)
+                budgetAdditionRepository.sumAmountByEventId(EVENT_ID)
+                approvedSpendingTotalProvider.getApprovedSpendingTotal(EVENT_ID)
             }
         }
 
@@ -251,6 +266,8 @@ class EventCloseServiceTest {
 
     private fun verifyClosePortsNotCalled() {
         verify(exactly = 0) { pendingSpendingCountProvider.getPendingSpendingCount(any()) }
+        verify(exactly = 0) { budgetAdditionRepository.sumAmountByEventId(any()) }
+        verify(exactly = 0) { approvedSpendingTotalProvider.getApprovedSpendingTotal(any()) }
         verify(exactly = 0) { reportGenerationRequester.requestReportGeneration(any()) }
         assertThat(TransactionSynchronizationManager.getSynchronizations()).isEmpty()
     }

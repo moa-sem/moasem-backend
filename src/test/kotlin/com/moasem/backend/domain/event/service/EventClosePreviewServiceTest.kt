@@ -38,6 +38,7 @@ class EventClosePreviewServiceTest {
             groupAccessProvider,
             pendingSpendingCountProvider,
             approvedSpendingTotalProvider,
+            EventCloseDistributionCalculator(),
         )
         every { groupAccessProvider.existsGroup(GROUP_ID) } returns true
         every { groupAccessProvider.isMember(GROUP_ID, OWNER_ID) } returns true
@@ -66,6 +67,10 @@ class EventClosePreviewServiceTest {
             assertThat(response.totalBudget).isEqualTo(INITIAL_BUDGET)
             assertThat(response.approvedSpending).isZero()
             assertThat(response.remainingBudget).isEqualTo(INITIAL_BUDGET)
+            assertThat(response.refundPerPerson).isEqualTo(166_666L)
+            assertThat(response.refundRemainder).isEqualTo(2L)
+            assertThat(response.additionalChargePerPerson).isZero()
+            assertThat(response.overCollectedAmount).isZero()
 
             verifyOrder {
                 groupAccessProvider.existsGroup(GROUP_ID)
@@ -208,6 +213,10 @@ class EventClosePreviewServiceTest {
             assertThat(response.totalBudget).isEqualTo(650_000L)
             assertThat(response.approvedSpending).isEqualTo(320_000L)
             assertThat(response.remainingBudget).isEqualTo(330_000L)
+            assertThat(response.refundPerPerson).isEqualTo(110_000L)
+            assertThat(response.refundRemainder).isZero()
+            assertThat(response.additionalChargePerPerson).isZero()
+            assertThat(response.overCollectedAmount).isZero()
         }
 
         @Test
@@ -218,6 +227,10 @@ class EventClosePreviewServiceTest {
 
             assertThat(response.totalBudget).isEqualTo(500_000L)
             assertThat(response.remainingBudget).isEqualTo(-50_000L)
+            assertThat(response.refundPerPerson).isZero()
+            assertThat(response.refundRemainder).isZero()
+            assertThat(response.additionalChargePerPerson).isEqualTo(16_667L)
+            assertThat(response.overCollectedAmount).isEqualTo(1L)
         }
 
         @Test
