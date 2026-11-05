@@ -3,6 +3,7 @@ package com.moasem.backend.domain.spending.service
 import com.moasem.backend.domain.spending.dto.CreateSpendingRequest
 import com.moasem.backend.domain.spending.dto.EvidenceRequest
 import com.moasem.backend.domain.spending.dto.EvidenceUploadUrlRequest
+import com.moasem.backend.domain.spending.dto.ReceiptOcrRequest
 import com.moasem.backend.domain.spending.dto.UpdateSpendingRequest
 import com.moasem.backend.domain.spending.entity.EvidenceType
 import com.moasem.backend.domain.spending.entity.Spending
@@ -12,6 +13,8 @@ import com.moasem.backend.domain.spending.repository.SpendingRepository
 import com.moasem.backend.domain.spending.service.port.EventAccess
 import com.moasem.backend.domain.spending.service.port.EventAccessProvider
 import com.moasem.backend.domain.spending.service.port.GroupAccessProvider
+import com.moasem.backend.domain.spending.service.port.ReceiptOcrClient
+import com.moasem.backend.domain.spending.service.port.ReceiptOcrResult
 import com.moasem.backend.domain.spending.service.port.UserNameProvider
 import com.moasem.backend.global.storage.FakePrivateFileStorage
 import com.moasem.backend.global.storage.FileUploadPolicy
@@ -38,6 +41,7 @@ class SpendingServiceTest {
     private val groupAccessProvider = mockk<GroupAccessProvider>()
     private val fileStorage = FakePrivateFileStorage()
     private val userNameProvider = mockk<UserNameProvider>()
+    private val receiptOcrClient = mockk<ReceiptOcrClient>()
     private lateinit var spendingService: SpendingService
 
     @BeforeEach
@@ -48,10 +52,69 @@ class SpendingServiceTest {
             groupAccessProvider,
             fileStorage,
             userNameProvider,
+            receiptOcrClient,
         )
         every { userNameProvider.findNames(any()) } returns mapOf(MEMBER_ID to "김소담")
         every { eventAccessProvider.findAccess(EVENT_ID) } returns activeEvent()
         every { groupAccessProvider.isMember(GROUP_ID, MEMBER_ID) } returns true
+    }
+
+    @Nested
+    @DisplayName("영수증 인식")
+    inner class RecognizeReceipt {
+
+        private val image = byteArrayOf(1, 2, 3)
+
+        @Test
+        fun `업로드된 영수증을 읽어 결과를 그대로 돌려준다`() {
+            fileStorage.files[evidenceKey(MEMBER_ID)] = image
+            every { receiptOcrClient.recognize(image, "image/jpeg") } returns
+                ReceiptOcrResult(15_000L, LocalDate.of(2026, 8, 20), "김밥천국", SpendingTag.MEAL)
+
+            val response = spendingService.recognizeReceipt(EVENT_ID, MEMBER_ID, ReceiptOcrRequest(evidenceKey(MEMBER_ID)))
+
+            assertThat(response.amount).isEqualTo(15_000L)
+            assertThat(response.spentOn).isEqualTo(LocalDate.of(2026, 8, 20))
+            assertThat(response.merchantName).isEqualTo("김밥천국")
+            assertThat(response.tag).isEqualTo(SpendingTag.MEAL)
+        }
+
+        @Test
+        fun `인식에 실패하면 오류 대신 빈 결과를 준다`() {
+            fileStorage.files[evidenceKey(MEMBER_ID)] = image
+            every { receiptOcrClient.recognize(any(), any()) } throws RuntimeException("timeout")
+
+            val response = spendingService.recognizeReceipt(EVENT_ID, MEMBER_ID, ReceiptOcrRequest(evidenceKey(MEMBER_ID)))
+
+            assertThat(response.amount).isNull()
+            assertThat(response.tag).isNull()
+        }
+
+        @Test
+        fun `업로드가 끝나지 않아 파일이 없으면 거부한다`() {
+            assertThatThrownBy {
+                spendingService.recognizeReceipt(EVENT_ID, MEMBER_ID, ReceiptOcrRequest(evidenceKey(MEMBER_ID)))
+            }.hasErrorCode(ErrorCode.EVIDENCE_FILE_NOT_FOUND)
+        }
+
+        @Test
+        fun `남의 저장 키로는 읽을 수 없다`() {
+            fileStorage.files[evidenceKey(OUTSIDER_ID)] = image
+
+            assertThatThrownBy {
+                spendingService.recognizeReceipt(EVENT_ID, MEMBER_ID, ReceiptOcrRequest(evidenceKey(OUTSIDER_ID)))
+            }.hasErrorCode(ErrorCode.INVALID_EVIDENCE_KEY)
+            verify(exactly = 0) { receiptOcrClient.recognize(any(), any()) }
+        }
+
+        @Test
+        fun `상위 경로 표기로 남의 키를 가리키면 거부한다`() {
+            val sneaky = "spendings/$EVENT_ID/$MEMBER_ID/../$OUTSIDER_ID/evidence.jpg"
+
+            assertThatThrownBy {
+                spendingService.recognizeReceipt(EVENT_ID, MEMBER_ID, ReceiptOcrRequest(sneaky))
+            }.hasErrorCode(ErrorCode.INVALID_EVIDENCE_KEY)
+        }
     }
 
     @Nested

@@ -7,6 +7,11 @@ import io.mockk.slot
 import org.assertj.core.api.Assertions.assertThat
 import org.junit.jupiter.api.DisplayName
 import org.junit.jupiter.api.Test
+import software.amazon.awssdk.core.ResponseBytes
+import software.amazon.awssdk.services.s3.S3Client
+import software.amazon.awssdk.services.s3.model.GetObjectRequest
+import software.amazon.awssdk.services.s3.model.GetObjectResponse
+import software.amazon.awssdk.services.s3.model.NoSuchKeyException
 import software.amazon.awssdk.services.s3.presigner.S3Presigner
 import software.amazon.awssdk.services.s3.presigner.model.GetObjectPresignRequest
 import software.amazon.awssdk.services.s3.presigner.model.PresignedGetObjectRequest
@@ -27,7 +32,8 @@ class S3PrivateFileStorageTest {
 
     private val s3Presigner = mockk<S3Presigner>()
     private val properties = S3Properties(bucket = BUCKET, region = "ap-northeast-2")
-    private val storage = S3PrivateFileStorage(s3Presigner, properties)
+    private val s3Client = mockk<S3Client>()
+    private val storage = S3PrivateFileStorage(s3Presigner, s3Client, properties)
 
     @Test
     @DisplayName("업로드 URL에 형식과 크기를 함께 묶는다")
@@ -96,6 +102,26 @@ class S3PrivateFileStorageTest {
 
     private fun presignedGet() = mockk<PresignedGetObjectRequest>().also {
         every { it.url() } returns URI.create("https://s3.example/$KEY?sig=get").toURL()
+    }
+
+    @Test
+    @DisplayName("파일을 읽을 때 버킷과 키를 그대로 넘긴다")
+    fun readsObjectBytes() {
+        val request = slot<GetObjectRequest>()
+        every { s3Client.getObjectAsBytes(capture(request)) } returns
+            ResponseBytes.fromByteArray(GetObjectResponse.builder().build(), byteArrayOf(1, 2, 3))
+
+        assertThat(storage.read(KEY)).containsExactly(1, 2, 3)
+        assertThat(request.captured.bucket()).isEqualTo(BUCKET)
+        assertThat(request.captured.key()).isEqualTo(KEY)
+    }
+
+    @Test
+    @DisplayName("없는 키를 읽으면 null이다")
+    fun readMissingObject() {
+        every { s3Client.getObjectAsBytes(any<GetObjectRequest>()) } throws NoSuchKeyException.builder().build()
+
+        assertThat(storage.read(KEY)).isNull()
     }
 
     companion object {

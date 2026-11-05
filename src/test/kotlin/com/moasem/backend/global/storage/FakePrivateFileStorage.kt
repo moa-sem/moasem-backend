@@ -13,6 +13,9 @@ class FakePrivateFileStorage : PrivateFileStorage {
     val issuedUploads = mutableListOf<IssuedUpload>()
     val issuedDownloadKeys = mutableListOf<String>()
 
+    /** 업로드된 것으로 칠 파일. 테스트가 직접 채운다. */
+    val files = mutableMapOf<String, ByteArray>()
+
     override fun issueUploadUrl(key: String, contentType: String, contentLength: Long, expiry: Duration): String {
         validateKey(key)
         issuedUploads += IssuedUpload(key, contentType, contentLength, expiry)
@@ -23,6 +26,11 @@ class FakePrivateFileStorage : PrivateFileStorage {
         validateKey(key)
         issuedDownloadKeys += key
         return "https://fake-storage.test/$key?method=GET&expires=${expiry.seconds}"
+    }
+
+    override fun read(key: String): ByteArray? {
+        validateKey(key)
+        return files[key]
     }
 
     private fun validateKey(key: String) {
