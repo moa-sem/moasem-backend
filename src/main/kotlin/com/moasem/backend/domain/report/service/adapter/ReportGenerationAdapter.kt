@@ -1,7 +1,10 @@
 package com.moasem.backend.domain.report.service.adapter
 
+import com.moasem.backend.domain.event.service.port.EventSettlementSnapshot
+import com.moasem.backend.domain.event.service.port.EventSettlementSnapshotRecorder
 import com.moasem.backend.domain.event.service.port.ReportGenerationRequester
 import com.moasem.backend.domain.report.service.ReportGenerationService
+import com.moasem.backend.domain.report.service.ReportSnapshotPreparationService
 import com.moasem.backend.global.config.AsyncConfig
 import org.slf4j.LoggerFactory
 import org.springframework.scheduling.annotation.Async
@@ -23,9 +26,14 @@ import org.springframework.stereotype.Component
 @Component
 class ReportGenerationAdapter(
     private val reportGenerationService: ReportGenerationService,
-) : ReportGenerationRequester {
+    private val reportSnapshotPreparationService: ReportSnapshotPreparationService,
+) : ReportGenerationRequester, EventSettlementSnapshotRecorder {
 
     private val log = LoggerFactory.getLogger(javaClass)
+
+    override fun record(eventId: Long, settlement: EventSettlementSnapshot) {
+        reportSnapshotPreparationService.prepare(eventId, settlement)
+    }
 
     /**
      * 호출 즉시 반환하고 생성은 백그라운드에서 진행한다.

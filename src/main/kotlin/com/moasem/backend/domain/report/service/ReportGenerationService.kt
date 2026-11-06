@@ -4,7 +4,6 @@ import com.moasem.backend.domain.report.entity.Report
 import com.moasem.backend.domain.report.entity.ReportSnapshot
 import com.moasem.backend.domain.report.repository.ReportRepository
 import com.moasem.backend.domain.report.service.port.AiAnalysisInput
-import com.moasem.backend.domain.report.service.port.EventSnapshotProvider
 import com.moasem.backend.domain.report.service.port.ReportAiClient
 import com.moasem.backend.domain.report.service.port.ReportAiException
 import com.moasem.backend.domain.report.service.port.ReportFileStorage
@@ -24,8 +23,6 @@ import org.springframework.transaction.annotation.Transactional
 @Service
 class ReportGenerationService(
     private val reportRepository: ReportRepository,
-    private val eventSnapshotProvider: EventSnapshotProvider,
-    private val snapshotCalculator: ReportSnapshotCalculator,
     private val pdfGenerator: ReportPdfGenerator,
     private val csvGenerator: ReportCsvGenerator,
     private val fileStorage: ReportFileStorage,
@@ -35,24 +32,18 @@ class ReportGenerationService(
     private val log = LoggerFactory.getLogger(javaClass)
 
     /**
-     * 행사 마감 직후 호출한다. 보고서를 만들고 파일까지 저장한다.
+     * 행사 마감 커밋 이후 호출한다. 이미 확정된 스냅샷으로 파일과 AI 분석을 생성한다.
      *
-     * @throws BusinessException 이미 보고서가 있거나 마감되지 않은 행사인 경우
+     * @throws BusinessException 마감 트랜잭션에서 확정한 보고서가 없는 경우
      */
     @Transactional
     fun generate(eventId: Long): Report {
-        if (reportRepository.existsByEventId(eventId)) {
-            throw BusinessException(ErrorCode.REPORT_ALREADY_EXISTS)
+        val report = reportRepository.findByEventId(eventId)
+            ?: throw BusinessException(ErrorCode.REPORT_NOT_FOUND)
+        val snapshot = checkNotNull(report.snapshot) {
+            "스냅샷이 없는 보고서입니다. eventId=${report.eventId}"
         }
-
-        // 스냅샷을 먼저 확정한 뒤에 보고서 행을 만든다. 마감되지 않은 행사처럼 사전 조건을
-        // 어긴 경우에 FAILED 행이 남으면, 나중에 행사가 실제로 마감돼도 event_id unique 제약
-        // 때문에 새 보고서를 만들 수 없게 된다.
-        val snapshot = snapshotCalculator.calculate(eventSnapshotProvider.fetch(eventId))
-
-        val report = reportRepository.save(Report.create(eventId))
         report.startGenerating()
-        report.applySnapshot(snapshot)
 
         return runGeneration(report, snapshot)
     }

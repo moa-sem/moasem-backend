@@ -1,5 +1,6 @@
 package com.moasem.backend.domain.report.service
 
+import com.moasem.backend.domain.event.service.port.EventSettlementSnapshot
 import com.moasem.backend.domain.report.entity.ReportSnapshot
 import com.moasem.backend.domain.report.service.port.EventSnapshotData
 import com.moasem.backend.global.error.BusinessException
@@ -15,7 +16,7 @@ import org.springframework.stereotype.Component
 @Component
 class ReportSnapshotCalculator {
 
-    fun calculate(data: EventSnapshotData): ReportSnapshot {
+    fun calculate(data: EventSnapshotData, settlement: EventSettlementSnapshot? = null): ReportSnapshot {
         if (data.status != CLOSED_STATUS) {
             throw BusinessException(
                 ErrorCode.EVENT_NOT_CLOSED,
@@ -23,8 +24,9 @@ class ReportSnapshotCalculator {
             )
         }
 
-        val totalBudget = data.initialBudget + data.budgetAdditions.sumOf { it.amount }
-        val totalSpent = data.approvedSpendings.sumOf { it.amount }
+        val totalBudget = settlement?.totalBudget ?: data.initialBudget + data.budgetAdditions.sumOf { it.amount }
+        val totalSpent = settlement?.approvedSpending ?: data.approvedSpendings.sumOf { it.amount }
+        val remainingBalance = settlement?.remainingBudget ?: totalBudget - totalSpent
 
         return ReportSnapshot(
             event = ReportSnapshot.EventSummary(
@@ -34,7 +36,7 @@ class ReportSnapshotCalculator {
                 endAt = data.endAt,
                 groupId = data.groupId,
                 groupName = data.groupName,
-                participantCount = data.participantCount,
+                participantCount = settlement?.participantCount ?: data.participantCount,
             ),
             budget = ReportSnapshot.BudgetSummary(
                 initialBudget = data.initialBudget,
@@ -51,7 +53,7 @@ class ReportSnapshotCalculator {
                 totalBudget = totalBudget,
                 totalSpent = totalSpent,
                 // 예산을 초과하면 음수가 된다. 0으로 막지 않는다 — 초과 사실이 보고서에 드러나야 한다.
-                remainingBalance = totalBudget - totalSpent,
+                remainingBalance = remainingBalance,
             ),
             tagTotals = calculateTagTotals(data),
             spendings = data.approvedSpendings
@@ -67,6 +69,16 @@ class ReportSnapshotCalculator {
                         receiptKey = it.receiptKey,
                     )
                 },
+            settlement = settlement?.let {
+                ReportSnapshot.SettlementSummary(
+                    participantCount = it.participantCount,
+                    refundPerPerson = it.refundPerPerson,
+                    refundRemainder = it.refundRemainder,
+                    additionalChargePerPerson = it.additionalChargePerPerson,
+                    overCollectedAmount = it.overCollectedAmount,
+                    closedAt = it.closedAt,
+                )
+            },
         )
     }
 

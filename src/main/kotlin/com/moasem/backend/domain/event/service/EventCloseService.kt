@@ -5,6 +5,8 @@ import com.moasem.backend.domain.event.entity.EventStatus
 import com.moasem.backend.domain.event.repository.BudgetAdditionRepository
 import com.moasem.backend.domain.event.repository.EventRepository
 import com.moasem.backend.domain.event.service.port.ApprovedSpendingTotalProvider
+import com.moasem.backend.domain.event.service.port.EventSettlementSnapshot
+import com.moasem.backend.domain.event.service.port.EventSettlementSnapshotRecorder
 import com.moasem.backend.domain.event.service.port.GroupAccessProvider
 import com.moasem.backend.domain.event.service.port.PendingSpendingCountProvider
 import com.moasem.backend.domain.event.service.port.ReportGenerationRequester
@@ -25,6 +27,7 @@ class EventCloseService(
     private val budgetAdditionRepository: BudgetAdditionRepository,
     private val approvedSpendingTotalProvider: ApprovedSpendingTotalProvider,
     private val eventCloseDistributionCalculator: EventCloseDistributionCalculator,
+    private val eventSettlementSnapshotRecorder: EventSettlementSnapshotRecorder,
 ) {
 
     private val log = LoggerFactory.getLogger(javaClass)
@@ -56,6 +59,20 @@ class EventCloseService(
         val distribution = eventCloseDistributionCalculator.calculate(totalBudget, approvedSpending, participantCount)
 
         event.close(participantCount)
+        eventSettlementSnapshotRecorder.record(
+            persistedEventId,
+            EventSettlementSnapshot(
+                totalBudget = totalBudget,
+                approvedSpending = approvedSpending,
+                remainingBudget = distribution.remainingBudget,
+                participantCount = participantCount,
+                refundPerPerson = distribution.refundPerPerson,
+                refundRemainder = distribution.refundRemainder,
+                additionalChargePerPerson = distribution.additionalChargePerPerson,
+                overCollectedAmount = distribution.overCollectedAmount,
+                closedAt = checkNotNull(event.closedAt),
+            ),
+        )
         requestReportGenerationAfterCommit(persistedEventId)
 
         return EventCloseResponse(
