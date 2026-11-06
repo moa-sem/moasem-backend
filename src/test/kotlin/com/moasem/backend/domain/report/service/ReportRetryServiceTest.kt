@@ -48,8 +48,6 @@ class ReportRetryServiceTest {
 
         generationService = ReportGenerationService(
             reportRepository = reportRepository,
-            eventSnapshotProvider = snapshotProvider,
-            snapshotCalculator = ReportSnapshotCalculator(),
             pdfGenerator = ReportPdfGenerator(),
             csvGenerator = ReportCsvGenerator(),
             fileStorage = storage,
@@ -59,12 +57,18 @@ class ReportRetryServiceTest {
             accessGuard = ReportAccessGuard(reportRepository, membershipProvider),
             generationService = generationService,
         )
+        prepareReport()
     }
 
     /** 저장에 실패시켜 FAILED 상태의 보고서를 만든다. */
     private fun givenFailedReport(): Report {
         storage.shouldFail = true
         return generationService.generate(EVENT_ID).also { storage.shouldFail = false }
+    }
+
+    private fun prepareReport() {
+        val snapshot = ReportSnapshotCalculator().calculate(snapshotProvider.fetch(EVENT_ID))
+        stored[EVENT_ID] = Report.create(EVENT_ID).also { it.applySnapshot(snapshot) }
     }
 
     @Test

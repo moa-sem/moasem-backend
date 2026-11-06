@@ -3,7 +3,7 @@ package com.moasem.backend.domain.report.entity
 import java.time.LocalDateTime
 
 /**
- * 보고서 생성 시점에 확정된 결산 결과.
+ * 행사 마감 트랜잭션에서 확정된 결산 결과.
  *
  * 한 번 저장하면 절대 갱신하지 않는다. 다운로드할 때마다 원본 지출 데이터를 다시 집계하면
  * 이후 데이터 변경에 따라 결과가 달라질 수 있어, 확정 시점의 수치를 통째로 얼려 둔다.
@@ -14,6 +14,8 @@ data class ReportSnapshot(
     val budget: BudgetSummary,
     val tagTotals: List<TagTotal>,
     val spendings: List<SpendingLine>,
+    /** #118 분배 계산으로 행사 마감 시점에 확정한 값. 기존 스냅샷에는 없을 수 있다. */
+    val settlement: SettlementSummary? = null,
 ) {
     data class EventSummary(
         val eventId: Long,
@@ -63,5 +65,14 @@ data class ReportSnapshot(
          * 나중에 원본 지출이 바뀌어도 "결산할 때 이 증빙이 있었다"는 사실은 바뀌지 않아야 한다.
          */
         val receiptKey: String?,
+    )
+
+    data class SettlementSummary(
+        val participantCount: Int,
+        val refundPerPerson: Long,
+        val refundRemainder: Long,
+        val additionalChargePerPerson: Long,
+        val overCollectedAmount: Long,
+        val closedAt: LocalDateTime,
     )
 }

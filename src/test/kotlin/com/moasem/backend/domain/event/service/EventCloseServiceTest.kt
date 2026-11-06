@@ -5,13 +5,15 @@ import com.moasem.backend.domain.event.entity.EventStatus
 import com.moasem.backend.domain.event.repository.BudgetAdditionRepository
 import com.moasem.backend.domain.event.repository.EventRepository
 import com.moasem.backend.domain.event.service.port.ApprovedSpendingTotalProvider
+import com.moasem.backend.domain.event.service.port.EventSettlementSnapshot
+import com.moasem.backend.domain.event.service.port.EventSettlementSnapshotRecorder
 import com.moasem.backend.domain.event.service.port.GroupAccessProvider
 import com.moasem.backend.domain.event.service.port.PendingSpendingCountProvider
 import com.moasem.backend.domain.event.service.port.ReportGenerationRequester
 import com.moasem.backend.global.error.ErrorCode
-import com.moasem.backend.global.error.hasErrorCode
 import io.mockk.every
 import io.mockk.mockk
+import io.mockk.slot
 import io.mockk.verify
 import io.mockk.verifyOrder
 import org.assertj.core.api.Assertions.assertThat
@@ -33,6 +35,7 @@ class EventCloseServiceTest {
     private val reportGenerationRequester = mockk<ReportGenerationRequester>()
     private val budgetAdditionRepository = mockk<BudgetAdditionRepository>()
     private val approvedSpendingTotalProvider = mockk<ApprovedSpendingTotalProvider>()
+    private val eventSettlementSnapshotRecorder = mockk<EventSettlementSnapshotRecorder>()
     private lateinit var eventCloseService: EventCloseService
 
     @BeforeEach
@@ -45,6 +48,7 @@ class EventCloseServiceTest {
             budgetAdditionRepository,
             approvedSpendingTotalProvider,
             EventCloseDistributionCalculator(),
+            eventSettlementSnapshotRecorder,
         )
         TransactionSynchronizationManager.initSynchronization()
         every { groupAccessProvider.existsGroup(GROUP_ID) } returns true
@@ -57,6 +61,7 @@ class EventCloseServiceTest {
         every { reportGenerationRequester.requestReportGeneration(EVENT_ID) } returns Unit
         every { budgetAdditionRepository.sumAmountByEventId(EVENT_ID) } returns 0L
         every { approvedSpendingTotalProvider.getApprovedSpendingTotal(EVENT_ID) } returns 0L
+        every { eventSettlementSnapshotRecorder.record(EVENT_ID, any()) } returns Unit
     }
 
     @AfterEach
@@ -109,11 +114,54 @@ class EventCloseServiceTest {
         }
 
         @Test
+        fun `마감 트랜잭션에서 최신 결산값을 스냅샷으로 저장한다`() {
+            every { budgetAdditionRepository.sumAmountByEventId(EVENT_ID) } returns 100_000L
+            every { approvedSpendingTotalProvider.getApprovedSpendingTotal(EVENT_ID) } returns 250_001L
+            val snapshot = slot<EventSettlementSnapshot>()
+            every { eventSettlementSnapshotRecorder.record(EVENT_ID, capture(snapshot)) } returns Unit
+
+            closeEvent()
+
+            assertThat(snapshot.captured.totalBudget).isEqualTo(600_000L)
+            assertThat(snapshot.captured.approvedSpending).isEqualTo(250_001L)
+            assertThat(snapshot.captured.remainingBudget).isEqualTo(349_999L)
+            assertThat(snapshot.captured.participantCount).isEqualTo(PARTICIPANT_COUNT)
+            assertThat(snapshot.captured.refundPerPerson).isEqualTo(116_666L)
+            assertThat(snapshot.captured.refundRemainder).isEqualTo(1L)
+            assertThat(snapshot.captured.closedAt).isNotNull()
+        }
+
+        @Test
+        fun `양수 0 음수 잔액의 스냅샷은 분배 계산 결과와 일치한다`() {
+            val captured = mutableListOf<EventSettlementSnapshot>()
+            every { eventSettlementSnapshotRecorder.record(EVENT_ID, capture(captured)) } returns Unit
+
+            listOf(499_999L, 500_000L, 500_002L).forEachIndexed { index, spent ->
+                val current = event(EVENT_ID)
+                every {
+                    eventRepository.findByIdAndGroupIdAndDeletedAtIsNullForUpdate(EVENT_ID, GROUP_ID)
+                } returns current
+                every { approvedSpendingTotalProvider.getApprovedSpendingTotal(EVENT_ID) } returns spent
+                closeEvent()
+                if (index < 2) TransactionSynchronizationManager.clearSynchronization().also {
+                    TransactionSynchronizationManager.initSynchronization()
+                }
+            }
+
+            assertThat(captured.map { it.remainingBudget }).containsExactly(1L, 0L, -2L)
+            assertThat(captured[0].refundPerPerson).isZero()
+            assertThat(captured[0].refundRemainder).isEqualTo(1L)
+            assertThat(captured[1].additionalChargePerPerson).isZero()
+            assertThat(captured[2].additionalChargePerPerson).isEqualTo(1L)
+            assertThat(captured[2].overCollectedAmount).isEqualTo(1L)
+        }
+
+        @Test
         fun `MEMBER는 행사를 마감할 수 없다`() {
             every { groupAccessProvider.isOwner(GROUP_ID, OWNER_ID) } returns false
 
             assertThatThrownBy { closeEvent() }
-                .hasErrorCode(ErrorCode.NOT_GROUP_OWNER)
+                .hasFieldOrPropertyWithValue("errorCode", ErrorCode.NOT_GROUP_OWNER)
 
             verify(exactly = 0) { eventRepository.findByIdAndGroupIdAndDeletedAtIsNullForUpdate(any(), any()) }
             verifyClosePortsNotCalled()
@@ -124,7 +172,7 @@ class EventCloseServiceTest {
             every { groupAccessProvider.isMember(GROUP_ID, OWNER_ID) } returns false
 
             assertThatThrownBy { closeEvent() }
-                .hasErrorCode(ErrorCode.NOT_GROUP_MEMBER)
+                .hasFieldOrPropertyWithValue("errorCode", ErrorCode.NOT_GROUP_MEMBER)
 
             verify(exactly = 0) { groupAccessProvider.isOwner(any(), any()) }
             verify(exactly = 0) { eventRepository.findByIdAndGroupIdAndDeletedAtIsNullForUpdate(any(), any()) }
@@ -136,7 +184,7 @@ class EventCloseServiceTest {
             every { groupAccessProvider.existsGroup(GROUP_ID) } returns false
 
             assertThatThrownBy { closeEvent() }
-                .hasErrorCode(ErrorCode.GROUP_NOT_FOUND)
+                .hasFieldOrPropertyWithValue("errorCode", ErrorCode.GROUP_NOT_FOUND)
 
             verify(exactly = 0) { groupAccessProvider.isMember(any(), any()) }
             verify(exactly = 0) { groupAccessProvider.isOwner(any(), any()) }
@@ -151,7 +199,7 @@ class EventCloseServiceTest {
             } returns null
 
             assertThatThrownBy { closeEvent() }
-                .hasErrorCode(ErrorCode.EVENT_NOT_FOUND)
+                .hasFieldOrPropertyWithValue("errorCode", ErrorCode.EVENT_NOT_FOUND)
 
             verifyClosePortsNotCalled()
         }
@@ -163,7 +211,7 @@ class EventCloseServiceTest {
             } returns null
 
             assertThatThrownBy { closeEvent() }
-                .hasErrorCode(ErrorCode.EVENT_NOT_FOUND)
+                .hasFieldOrPropertyWithValue("errorCode", ErrorCode.EVENT_NOT_FOUND)
 
             verifyClosePortsNotCalled()
         }
@@ -175,7 +223,7 @@ class EventCloseServiceTest {
             } returns null
 
             assertThatThrownBy { closeEvent() }
-                .hasErrorCode(ErrorCode.EVENT_NOT_FOUND)
+                .hasFieldOrPropertyWithValue("errorCode", ErrorCode.EVENT_NOT_FOUND)
 
             verify { eventRepository.findByIdAndGroupIdAndDeletedAtIsNullForUpdate(EVENT_ID, GROUP_ID) }
             verifyClosePortsNotCalled()
@@ -188,7 +236,7 @@ class EventCloseServiceTest {
             } returns closedEvent(EVENT_ID)
 
             assertThatThrownBy { closeEvent() }
-                .hasErrorCode(ErrorCode.EVENT_ALREADY_CLOSED)
+                .hasFieldOrPropertyWithValue("errorCode", ErrorCode.EVENT_ALREADY_CLOSED)
 
             verifyClosePortsNotCalled()
         }
@@ -202,7 +250,7 @@ class EventCloseServiceTest {
 
             listOf(0, -1).forEach { invalidParticipantCount ->
                 assertThatThrownBy { closeEvent(participantCount = invalidParticipantCount) }
-                    .hasErrorCode(ErrorCode.INVALID_INPUT_VALUE)
+                    .hasFieldOrPropertyWithValue("errorCode", ErrorCode.INVALID_INPUT_VALUE)
             }
 
             assertThat(event.status).isEqualTo(EventStatus.ACTIVE)
@@ -220,7 +268,7 @@ class EventCloseServiceTest {
             every { pendingSpendingCountProvider.getPendingSpendingCount(EVENT_ID) } returns 1L
 
             assertThatThrownBy { closeEvent() }
-                .hasErrorCode(ErrorCode.EVENT_HAS_PENDING_SPENDING)
+                .hasFieldOrPropertyWithValue("errorCode", ErrorCode.EVENT_HAS_PENDING_SPENDING)
 
             assertThat(event.status).isEqualTo(EventStatus.ACTIVE)
             assertThat(event.participantCount).isNull()
@@ -268,6 +316,7 @@ class EventCloseServiceTest {
         verify(exactly = 0) { pendingSpendingCountProvider.getPendingSpendingCount(any()) }
         verify(exactly = 0) { budgetAdditionRepository.sumAmountByEventId(any()) }
         verify(exactly = 0) { approvedSpendingTotalProvider.getApprovedSpendingTotal(any()) }
+        verify(exactly = 0) { eventSettlementSnapshotRecorder.record(any(), any()) }
         verify(exactly = 0) { reportGenerationRequester.requestReportGeneration(any()) }
         assertThat(TransactionSynchronizationManager.getSynchronizations()).isEmpty()
     }
