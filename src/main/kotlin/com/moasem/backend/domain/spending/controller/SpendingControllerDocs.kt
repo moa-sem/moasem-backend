@@ -4,6 +4,8 @@ import com.moasem.backend.domain.spending.dto.CreateSpendingRequest
 import com.moasem.backend.domain.spending.dto.EvidenceDownloadUrlResponse
 import com.moasem.backend.domain.spending.dto.EvidenceUploadUrlRequest
 import com.moasem.backend.domain.spending.dto.EvidenceUploadUrlResponse
+import com.moasem.backend.domain.spending.dto.ReceiptOcrRequest
+import com.moasem.backend.domain.spending.dto.ReceiptOcrResponse
 import com.moasem.backend.domain.spending.dto.RejectSpendingRequest
 import com.moasem.backend.domain.spending.dto.SpendingDetailResponse
 import com.moasem.backend.domain.spending.dto.SpendingListResponse
@@ -59,6 +61,36 @@ interface SpendingControllerDocs {
         @Parameter(hidden = true) currentUserId: Long,
         request: EvidenceUploadUrlRequest,
     ): ApiResponse<EvidenceUploadUrlResponse>
+
+    @Operation(
+        summary = "영수증 인식",
+        description = """
+            업로드한 영수증 이미지를 AI로 읽어 지출 신청 폼에 채울 값을 돌려준다. 결과는 저장하지 않는다.
+
+            흐름: 증빙 업로드 URL 발급 → PUT 업로드 → **이 API** → 사용자가 확인·수정 → 지출 신청.
+            지출 신청에는 같은 `storageKey`를 그대로 보낸다.
+
+            읽지 못한 값은 null이다. AI 호출이 실패해도 오류 없이 모든 값이 null로 온다.
+            업로드가 끝나기 전에 호출하면 404를 돌려준다.
+        """,
+    )
+    @ApiResponses(
+        SwaggerResponse(responseCode = "200", description = "인식 완료 (읽지 못한 값은 null)"),
+        SwaggerResponse(
+            responseCode = "403",
+            description = "모임 구성원이 아님 (NOT_GROUP_MEMBER) 또는 본인이 발급받은 증빙 키가 아님 (INVALID_EVIDENCE_KEY)",
+        ),
+        SwaggerResponse(
+            responseCode = "404",
+            description = "행사 없음 (EVENT_NOT_FOUND) 또는 업로드된 파일 없음 (EVIDENCE_FILE_NOT_FOUND)",
+        ),
+        SwaggerResponse(responseCode = "409", description = "마감된 행사 (EVENT_ALREADY_CLOSED)"),
+    )
+    fun recognizeReceipt(
+        @Parameter(description = "행사 ID", example = "1") eventId: Long,
+        @Parameter(hidden = true) currentUserId: Long,
+        request: ReceiptOcrRequest,
+    ): ApiResponse<ReceiptOcrResponse>
 
     @Operation(
         summary = "지출 신청",

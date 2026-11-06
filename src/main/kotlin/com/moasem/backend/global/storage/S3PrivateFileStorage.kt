@@ -3,7 +3,9 @@ package com.moasem.backend.global.storage
 import com.moasem.backend.global.config.S3Properties
 import org.springframework.context.annotation.Profile
 import org.springframework.stereotype.Component
+import software.amazon.awssdk.services.s3.S3Client
 import software.amazon.awssdk.services.s3.model.GetObjectRequest
+import software.amazon.awssdk.services.s3.model.NoSuchKeyException
 import software.amazon.awssdk.services.s3.model.PutObjectRequest
 import software.amazon.awssdk.services.s3.presigner.S3Presigner
 import software.amazon.awssdk.services.s3.presigner.model.GetObjectPresignRequest
@@ -22,6 +24,7 @@ import java.time.Duration
 @Component
 class S3PrivateFileStorage(
     private val s3Presigner: S3Presigner,
+    private val s3Client: S3Client,
     private val properties: S3Properties,
 ) : PrivateFileStorage {
 
@@ -60,5 +63,18 @@ class S3PrivateFileStorage(
             .build()
 
         return s3Presigner.presignGetObject(presignRequest).url().toExternalForm()
+    }
+
+    override fun read(key: String): ByteArray? {
+        val request = GetObjectRequest.builder()
+            .bucket(properties.bucket)
+            .key(key)
+            .build()
+
+        return try {
+            s3Client.getObjectAsBytes(request).asByteArray()
+        } catch (e: NoSuchKeyException) {
+            null
+        }
     }
 }

@@ -6,6 +6,8 @@ import com.moasem.backend.domain.event.service.port.PendingSpendingCountProvider
 import com.moasem.backend.domain.event.service.port.SpendingHistoryProvider
 import com.moasem.backend.domain.report.service.port.AiAnalysisInput
 import com.moasem.backend.domain.report.service.port.ReportAiClient
+import com.moasem.backend.domain.spending.service.port.ReceiptOcrClient
+import com.moasem.backend.domain.spending.service.port.ReceiptOcrResult
 import org.springframework.boot.autoconfigure.condition.ConditionalOnMissingBean
 import org.springframework.context.annotation.Bean
 import org.springframework.context.annotation.Configuration
@@ -61,5 +63,12 @@ class LocalPortStubs {
     fun stubReportAiClient() = object : ReportAiClient {
         override fun analyze(input: AiAnalysisInput): String =
             "[임시] AI 분석이 아직 연결되지 않았습니다."
+    }
+
+    /** 키가 없으면 아무것도 읽지 못한 것으로 친다. 프론트는 빈 폼을 그대로 보여 주면 된다. */
+    @Bean
+    @ConditionalOnMissingBean(ReceiptOcrClient::class)
+    fun stubReceiptOcrClient() = object : ReceiptOcrClient {
+        override fun recognize(image: ByteArray, mimeType: String) = ReceiptOcrResult.EMPTY
     }
 }
