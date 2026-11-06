@@ -145,7 +145,8 @@ class SpendingService(
         currentUserId: Long,
         request: UpdateSpendingRequest,
     ): SpendingDetailResponse {
-        findAccessibleEvent(eventId, currentUserId)
+        val access = findAccessibleEvent(eventId, currentUserId)
+        validateEventActive(access, "마감된 행사의 지출은 수정할 수 없습니다.")
 
         val spending = findSpendingOf(eventId, spendingId)
         if (!spending.isApplicant(currentUserId)) throw BusinessException(ErrorCode.NOT_SPENDING_APPLICANT)
@@ -228,9 +229,11 @@ class SpendingService(
      */
     private fun validateApplicable(eventId: Long, userId: Long) {
         val access = findAccessibleEvent(eventId, userId)
-        if (!access.isActive) {
-            throw BusinessException(ErrorCode.EVENT_ALREADY_CLOSED, "마감된 행사에는 지출을 신청할 수 없습니다.")
-        }
+        validateEventActive(access, "마감된 행사에는 지출을 신청할 수 없습니다.")
+    }
+
+    private fun validateEventActive(access: EventAccess, message: String) {
+        if (!access.isActive) throw BusinessException(ErrorCode.EVENT_ALREADY_CLOSED, message)
     }
 
     /** 요청자가 들여다봐도 되는 행사인지 확인하고 행사 정보를 돌려준다. */

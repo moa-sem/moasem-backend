@@ -32,7 +32,7 @@ class SpendingApprovalService(
      */
     @Transactional
     fun approve(eventId: Long, spendingId: Long, currentUserId: Long): SpendingDetailResponse {
-        validateOwner(eventId, currentUserId)
+        validateOwnerAndActiveEvent(eventId, currentUserId)
 
         val spending = findForProcessing(eventId, spendingId)
         spending.approve(currentUserId)
@@ -48,7 +48,7 @@ class SpendingApprovalService(
         currentUserId: Long,
         request: RejectSpendingRequest,
     ): SpendingDetailResponse {
-        validateOwner(eventId, currentUserId)
+        validateOwnerAndActiveEvent(eventId, currentUserId)
 
         val spending = findForProcessing(eventId, spendingId)
         spending.reject(currentUserId, request.reason)
@@ -56,7 +56,7 @@ class SpendingApprovalService(
         return SpendingDetailResponse.from(spending)
     }
 
-    private fun validateOwner(eventId: Long, userId: Long) {
+    private fun validateOwnerAndActiveEvent(eventId: Long, userId: Long) {
         require(eventId > 0) { "행사 ID는 양수여야 합니다." }
         require(userId > 0) { "사용자 ID는 양수여야 합니다." }
 
@@ -64,6 +64,9 @@ class SpendingApprovalService(
             ?: throw BusinessException(ErrorCode.EVENT_NOT_FOUND)
         if (!groupAccessProvider.isOwner(access.groupId, userId)) {
             throw BusinessException(ErrorCode.NOT_GROUP_OWNER, "모임장만 지출을 처리할 수 있습니다.")
+        }
+        if (!access.isActive) {
+            throw BusinessException(ErrorCode.EVENT_ALREADY_CLOSED, "마감된 행사의 지출은 처리할 수 없습니다.")
         }
     }
 

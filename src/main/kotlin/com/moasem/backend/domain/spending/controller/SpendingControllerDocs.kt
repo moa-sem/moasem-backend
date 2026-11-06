@@ -139,7 +139,10 @@ interface SpendingControllerDocs {
             description = "본인 신청이 아님 (NOT_SPENDING_APPLICANT), 구성원 아님 (NOT_GROUP_MEMBER), 증빙 키 불일치 (INVALID_EVIDENCE_KEY)",
         ),
         SwaggerResponse(responseCode = "404", description = "행사 또는 지출 없음 (EVENT_NOT_FOUND, SPENDING_NOT_FOUND)"),
-        SwaggerResponse(responseCode = "409", description = "이미 처리된 지출 (SPENDING_ALREADY_HANDLED)"),
+        SwaggerResponse(
+            responseCode = "409",
+            description = "마감된 행사 (EVENT_ALREADY_CLOSED) 또는 이미 처리된 지출 (SPENDING_ALREADY_HANDLED)",
+        ),
     )
     fun updateSpending(
         @Parameter(description = "행사 ID", example = "1") eventId: Long,
@@ -225,7 +228,10 @@ interface SpendingControllerDocs {
         SwaggerResponse(responseCode = "200", description = "승인 성공"),
         SwaggerResponse(responseCode = "403", description = "모임장이 아님 (NOT_GROUP_OWNER)"),
         SwaggerResponse(responseCode = "404", description = "행사 또는 지출 없음 (EVENT_NOT_FOUND, SPENDING_NOT_FOUND)"),
-        SwaggerResponse(responseCode = "409", description = "이미 처리된 지출 (SPENDING_ALREADY_HANDLED)"),
+        SwaggerResponse(
+            responseCode = "409",
+            description = "마감된 행사 (EVENT_ALREADY_CLOSED) 또는 이미 처리된 지출 (SPENDING_ALREADY_HANDLED)",
+        ),
     )
     fun approveSpending(
         @Parameter(description = "행사 ID", example = "1") eventId: Long,
@@ -247,7 +253,10 @@ interface SpendingControllerDocs {
         SwaggerResponse(responseCode = "400", description = "반려 사유 누락 (INVALID_INPUT_VALUE)"),
         SwaggerResponse(responseCode = "403", description = "모임장이 아님 (NOT_GROUP_OWNER)"),
         SwaggerResponse(responseCode = "404", description = "행사 또는 지출 없음 (EVENT_NOT_FOUND, SPENDING_NOT_FOUND)"),
-        SwaggerResponse(responseCode = "409", description = "이미 처리된 지출 (SPENDING_ALREADY_HANDLED)"),
+        SwaggerResponse(
+            responseCode = "409",
+            description = "마감된 행사 (EVENT_ALREADY_CLOSED) 또는 이미 처리된 지출 (SPENDING_ALREADY_HANDLED)",
+        ),
     )
     fun rejectSpending(
         @Parameter(description = "행사 ID", example = "1") eventId: Long,
