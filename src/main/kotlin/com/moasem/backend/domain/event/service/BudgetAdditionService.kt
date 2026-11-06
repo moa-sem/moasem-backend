@@ -21,7 +21,7 @@ class BudgetAdditionService(
     @Transactional
     fun addBudgetAddition(groupId: Long, eventId: Long, currentUserId: Long, request: CreateBudgetAdditionRequest) {
         validateGroupOwner(groupId, currentUserId)
-        val event = eventRepository.findByIdAndGroupIdAndDeletedAtIsNull(eventId, groupId)
+        val event = eventRepository.findByIdAndGroupIdAndDeletedAtIsNullForUpdate(eventId, groupId)
             ?: throw BusinessException(ErrorCode.EVENT_NOT_FOUND)
         if (event.status != EventStatus.ACTIVE) {
             throw BusinessException(ErrorCode.EVENT_ALREADY_CLOSED, "진행 중인 행사에만 추가 예산을 등록할 수 있습니다.")

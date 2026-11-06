@@ -8,6 +8,9 @@ interface EventAccessProvider {
 
     /** 행사가 없으면 null을 돌려준다. */
     fun findAccess(eventId: Long): EventAccess?
+
+    /** 행사 종속 변경에서 공통으로 사용할 Event 행을 잠긴 채 조회한다. */
+    fun findAccessForUpdate(eventId: Long): EventAccess?
 }
 
 /**

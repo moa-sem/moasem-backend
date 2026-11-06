@@ -108,7 +108,7 @@ class SpendingService(
         currentUserId: Long,
         request: CreateSpendingRequest,
     ): SpendingDetailResponse {
-        validateApplicable(eventId, currentUserId)
+        validateApplicableForUpdate(eventId, currentUserId)
 
         val evidence = requireNotNull(request.evidence) { "증빙 정보는 필수입니다." }
         validateEvidenceKeyOwnership(evidence.storageKey, eventId, currentUserId)
@@ -145,10 +145,10 @@ class SpendingService(
         currentUserId: Long,
         request: UpdateSpendingRequest,
     ): SpendingDetailResponse {
-        val access = findAccessibleEvent(eventId, currentUserId)
+        val access = findAccessibleEventForUpdate(eventId, currentUserId)
         validateEventActive(access, "마감된 행사의 지출은 수정할 수 없습니다.")
 
-        val spending = findSpendingOf(eventId, spendingId)
+        val spending = findSpendingOfForUpdate(eventId, spendingId)
         if (!spending.isApplicant(currentUserId)) throw BusinessException(ErrorCode.NOT_SPENDING_APPLICANT)
 
         val evidence = requireNotNull(request.evidence) { "증빙 정보는 필수입니다." }
@@ -232,6 +232,11 @@ class SpendingService(
         validateEventActive(access, "마감된 행사에는 지출을 신청할 수 없습니다.")
     }
 
+    private fun validateApplicableForUpdate(eventId: Long, userId: Long) {
+        val access = findAccessibleEventForUpdate(eventId, userId)
+        validateEventActive(access, "마감된 행사에는 지출을 신청할 수 없습니다.")
+    }
+
     private fun validateEventActive(access: EventAccess, message: String) {
         if (!access.isActive) throw BusinessException(ErrorCode.EVENT_ALREADY_CLOSED, message)
     }
@@ -249,9 +254,27 @@ class SpendingService(
         return access
     }
 
+    /** 행사 행을 먼저 잠그고 최신 상태와 소속을 검증한다. */
+    private fun findAccessibleEventForUpdate(eventId: Long, userId: Long): EventAccess {
+        require(eventId > 0) { "행사 ID는 양수여야 합니다." }
+        require(userId > 0) { "사용자 ID는 양수여야 합니다." }
+
+        val access = eventAccessProvider.findAccessForUpdate(eventId)
+            ?: throw BusinessException(ErrorCode.EVENT_NOT_FOUND)
+        if (!groupAccessProvider.isMember(access.groupId, userId)) {
+            throw BusinessException(ErrorCode.NOT_GROUP_MEMBER)
+        }
+        return access
+    }
+
     /** 경로의 행사에 실제로 속한 지출인지까지 확인해서 가져온다. */
     private fun findSpendingOf(eventId: Long, spendingId: Long): Spending =
         spendingRepository.findByIdAndEventId(spendingId, eventId)
+            ?: throw BusinessException(ErrorCode.SPENDING_NOT_FOUND)
+
+    /** Event 행 다음에 Spending 행을 잠그도록 호출 순서를 고정한다. */
+    private fun findSpendingOfForUpdate(eventId: Long, spendingId: Long): Spending =
+        spendingRepository.findWithLockByIdAndEventId(spendingId, eventId)
             ?: throw BusinessException(ErrorCode.SPENDING_NOT_FOUND)
 
     /**

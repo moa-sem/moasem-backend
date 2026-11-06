@@ -60,7 +60,7 @@ class SpendingApprovalService(
         require(eventId > 0) { "행사 ID는 양수여야 합니다." }
         require(userId > 0) { "사용자 ID는 양수여야 합니다." }
 
-        val access = eventAccessProvider.findAccess(eventId)
+        val access = eventAccessProvider.findAccessForUpdate(eventId)
             ?: throw BusinessException(ErrorCode.EVENT_NOT_FOUND)
         if (!groupAccessProvider.isOwner(access.groupId, userId)) {
             throw BusinessException(ErrorCode.NOT_GROUP_OWNER, "모임장만 지출을 처리할 수 있습니다.")

@@ -1,10 +1,12 @@
 package com.moasem.backend.domain.event.service.adapter
 
+import com.moasem.backend.domain.event.entity.Event
 import com.moasem.backend.domain.event.entity.EventStatus
 import com.moasem.backend.domain.event.repository.EventRepository
 import com.moasem.backend.domain.spending.service.port.EventAccess
 import com.moasem.backend.domain.spending.service.port.EventAccessProvider
 import org.springframework.stereotype.Component
+import org.springframework.transaction.annotation.Propagation
 import org.springframework.transaction.annotation.Transactional
 
 /**
@@ -26,10 +28,19 @@ class EventAccessAdapter(
         val event = eventRepository.findById(eventId).orElse(null) ?: return null
         if (event.isDeleted) return null
 
-        return EventAccess(
-            eventId = eventId,
-            groupId = event.groupId,
-            isActive = event.status == EventStatus.ACTIVE,
-        )
+        return event.toAccess()
     }
+
+    @Transactional(propagation = Propagation.MANDATORY)
+    override fun findAccessForUpdate(eventId: Long): EventAccess? {
+        val event = eventRepository.findByIdAndDeletedAtIsNullForUpdate(eventId) ?: return null
+        return event.toAccess()
+    }
+
+    private fun Event.toAccess(): EventAccess =
+        EventAccess(
+            eventId = checkNotNull(id),
+            groupId = groupId,
+            isActive = status == EventStatus.ACTIVE,
+        )
 }

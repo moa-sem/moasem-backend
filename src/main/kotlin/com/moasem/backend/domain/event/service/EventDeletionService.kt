@@ -19,7 +19,7 @@ class EventDeletionService(
     @Transactional
     fun deleteEvent(groupId: Long, eventId: Long, currentUserId: Long) {
         validateGroupOwner(groupId, currentUserId)
-        val event = eventRepository.findByIdAndGroupIdAndDeletedAtIsNull(eventId, groupId)
+        val event = eventRepository.findByIdAndGroupIdAndDeletedAtIsNullForUpdate(eventId, groupId)
             ?: throw BusinessException(ErrorCode.EVENT_NOT_FOUND)
 
         if (event.status != EventStatus.ACTIVE) {
