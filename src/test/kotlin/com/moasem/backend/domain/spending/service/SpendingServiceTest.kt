@@ -26,6 +26,7 @@ import org.springframework.data.domain.PageRequest
 import io.mockk.mockk
 import io.mockk.slot
 import io.mockk.verify
+import io.mockk.verifyOrder
 import org.assertj.core.api.Assertions.assertThat
 import org.assertj.core.api.Assertions.assertThatThrownBy
 import org.junit.jupiter.api.BeforeEach
@@ -56,6 +57,7 @@ class SpendingServiceTest {
         )
         every { userNameProvider.findNames(any()) } returns mapOf(MEMBER_ID to "김소담")
         every { eventAccessProvider.findAccess(EVENT_ID) } returns activeEvent()
+        every { eventAccessProvider.findAccessForUpdate(EVENT_ID) } returns activeEvent()
         every { groupAccessProvider.isMember(GROUP_ID, MEMBER_ID) } returns true
     }
 
@@ -199,6 +201,11 @@ class SpendingServiceTest {
             assertThat(saved.captured.amount).isEqualTo(15_000L)
             assertThat(response.spendingId).isEqualTo(SPENDING_ID)
             assertThat(response.status).isEqualTo(SpendingStatus.PENDING)
+            verifyOrder {
+                eventAccessProvider.findAccessForUpdate(EVENT_ID)
+                groupAccessProvider.isMember(GROUP_ID, MEMBER_ID)
+                spendingRepository.save(any())
+            }
         }
 
         @Test
@@ -259,7 +266,7 @@ class SpendingServiceTest {
 
         @Test
         fun `마감된 행사에는 신청할 수 없다`() {
-            every { eventAccessProvider.findAccess(EVENT_ID) } returns activeEvent(isActive = false)
+            every { eventAccessProvider.findAccessForUpdate(EVENT_ID) } returns activeEvent(isActive = false)
 
             assertThatThrownBy { spendingService.createSpending(EVENT_ID, MEMBER_ID, createRequest()) }
                 .hasErrorCode(ErrorCode.EVENT_ALREADY_CLOSED)
@@ -278,7 +285,7 @@ class SpendingServiceTest {
 
         @Test
         fun `구성원 여부를 마감 여부보다 먼저 검증한다`() {
-            every { eventAccessProvider.findAccess(EVENT_ID) } returns activeEvent(isActive = false)
+            every { eventAccessProvider.findAccessForUpdate(EVENT_ID) } returns activeEvent(isActive = false)
             every { groupAccessProvider.isMember(GROUP_ID, OUTSIDER_ID) } returns false
 
             assertThatThrownBy { spendingService.createSpending(EVENT_ID, OUTSIDER_ID, createRequest()) }
@@ -287,7 +294,7 @@ class SpendingServiceTest {
 
         @Test
         fun `없는 행사에는 신청할 수 없다`() {
-            every { eventAccessProvider.findAccess(EVENT_ID) } returns null
+            every { eventAccessProvider.findAccessForUpdate(EVENT_ID) } returns null
 
             assertThatThrownBy { spendingService.createSpending(EVENT_ID, MEMBER_ID, createRequest()) }
                 .hasErrorCode(ErrorCode.EVENT_NOT_FOUND)
@@ -301,20 +308,25 @@ class SpendingServiceTest {
         @Test
         fun `본인이 신청한 PENDING 지출은 내용과 증빙을 함께 바꾼다`() {
             val spending = savedSpending()
-            every { spendingRepository.findByIdAndEventId(SPENDING_ID, EVENT_ID) } returns spending
+            every { spendingRepository.findWithLockByIdAndEventId(SPENDING_ID, EVENT_ID) } returns spending
 
             val response = spendingService.updateSpending(EVENT_ID, SPENDING_ID, MEMBER_ID, updateRequest())
 
             assertThat(spending.amount).isEqualTo(30_000L)
             assertThat(spending.reason).isEqualTo("1일차 저녁 식사")
             assertThat(response.amount).isEqualTo(30_000L)
+            verifyOrder {
+                eventAccessProvider.findAccessForUpdate(EVENT_ID)
+                groupAccessProvider.isMember(GROUP_ID, MEMBER_ID)
+                spendingRepository.findWithLockByIdAndEventId(SPENDING_ID, EVENT_ID)
+            }
         }
 
         @Test
         fun `마감된 행사의 PENDING 지출은 수정할 수 없고 내용이 보존된다`() {
             val spending = savedSpending()
-            every { eventAccessProvider.findAccess(EVENT_ID) } returns activeEvent(isActive = false)
-            every { spendingRepository.findByIdAndEventId(SPENDING_ID, EVENT_ID) } returns spending
+            every { eventAccessProvider.findAccessForUpdate(EVENT_ID) } returns activeEvent(isActive = false)
+            every { spendingRepository.findWithLockByIdAndEventId(SPENDING_ID, EVENT_ID) } returns spending
 
             assertThatThrownBy {
                 spendingService.updateSpending(EVENT_ID, SPENDING_ID, MEMBER_ID, updateRequest())
@@ -324,13 +336,13 @@ class SpendingServiceTest {
             assertThat(spending.amount).isEqualTo(15_000L)
             assertThat(spending.reason).isEqualTo("1일차 점심 식사")
             assertThat(spending.evidenceStorageKey).isEqualTo(evidenceKey(MEMBER_ID))
-            verify(exactly = 0) { spendingRepository.findByIdAndEventId(any(), any()) }
+            verify(exactly = 0) { spendingRepository.findWithLockByIdAndEventId(any(), any()) }
         }
 
         @Test
         fun `남이 신청한 지출은 수정할 수 없다`() {
             every { groupAccessProvider.isMember(GROUP_ID, OUTSIDER_ID) } returns true
-            every { spendingRepository.findByIdAndEventId(SPENDING_ID, EVENT_ID) } returns savedSpending()
+            every { spendingRepository.findWithLockByIdAndEventId(SPENDING_ID, EVENT_ID) } returns savedSpending()
 
             assertThatThrownBy {
                 spendingService.updateSpending(
@@ -344,7 +356,9 @@ class SpendingServiceTest {
 
         @Test
         fun `이미 처리된 지출은 수정할 수 없다`() {
-            every { spendingRepository.findByIdAndEventId(SPENDING_ID, EVENT_ID) } returns savedSpending(processed = true)
+            every {
+                spendingRepository.findWithLockByIdAndEventId(SPENDING_ID, EVENT_ID)
+            } returns savedSpending(processed = true)
 
             assertThatThrownBy { spendingService.updateSpending(EVENT_ID, SPENDING_ID, MEMBER_ID, updateRequest()) }
                 .hasErrorCode(ErrorCode.SPENDING_ALREADY_HANDLED)
@@ -352,7 +366,7 @@ class SpendingServiceTest {
 
         @Test
         fun `다른 행사에 속한 지출은 수정할 수 없다`() {
-            every { spendingRepository.findByIdAndEventId(SPENDING_ID, EVENT_ID) } returns null
+            every { spendingRepository.findWithLockByIdAndEventId(SPENDING_ID, EVENT_ID) } returns null
 
             assertThatThrownBy { spendingService.updateSpending(EVENT_ID, SPENDING_ID, MEMBER_ID, updateRequest()) }
                 .hasErrorCode(ErrorCode.SPENDING_NOT_FOUND)
@@ -360,7 +374,7 @@ class SpendingServiceTest {
 
         @Test
         fun `수정에서도 남의 증빙 저장 키는 붙일 수 없다`() {
-            every { spendingRepository.findByIdAndEventId(SPENDING_ID, EVENT_ID) } returns savedSpending()
+            every { spendingRepository.findWithLockByIdAndEventId(SPENDING_ID, EVENT_ID) } returns savedSpending()
 
             assertThatThrownBy {
                 spendingService.updateSpending(
