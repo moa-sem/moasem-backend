@@ -179,6 +179,55 @@ class SpendingControllerTest {
     }
 
     @Test
+    @DisplayName("마감된 행사의 지출 수정은 409와 EVENT_ALREADY_CLOSED를 반환한다")
+    fun updateClosedEventSpending() {
+        every { spendingService.updateSpending(EVENT_ID, SPENDING_ID, USER_ID, any()) } throws
+            BusinessException(ErrorCode.EVENT_ALREADY_CLOSED)
+
+        mockMvc.perform(
+            patch("/api/v1/events/$EVENT_ID/spendings/$SPENDING_ID")
+                .with(authentication(principalOf(USER_ID)))
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(objectMapper.writeValueAsString(createRequest())),
+        )
+            .andExpect(status().isConflict)
+            .andExpect(jsonPath("$.success").value(false))
+            .andExpect(jsonPath("$.code").value("EVENT_ALREADY_CLOSED"))
+    }
+
+    @Test
+    @DisplayName("마감된 행사의 지출 승인은 409와 EVENT_ALREADY_CLOSED를 반환한다")
+    fun approveClosedEventSpending() {
+        every { spendingApprovalService.approve(EVENT_ID, SPENDING_ID, OWNER_ID) } throws
+            BusinessException(ErrorCode.EVENT_ALREADY_CLOSED)
+
+        mockMvc.perform(
+            patch("/api/v1/events/$EVENT_ID/spendings/$SPENDING_ID/approval")
+                .with(authentication(principalOf(OWNER_ID))),
+        )
+            .andExpect(status().isConflict)
+            .andExpect(jsonPath("$.success").value(false))
+            .andExpect(jsonPath("$.code").value("EVENT_ALREADY_CLOSED"))
+    }
+
+    @Test
+    @DisplayName("마감된 행사의 지출 반려는 409와 EVENT_ALREADY_CLOSED를 반환한다")
+    fun rejectClosedEventSpending() {
+        every { spendingApprovalService.reject(EVENT_ID, SPENDING_ID, OWNER_ID, any()) } throws
+            BusinessException(ErrorCode.EVENT_ALREADY_CLOSED)
+
+        mockMvc.perform(
+            patch("/api/v1/events/$EVENT_ID/spendings/$SPENDING_ID/rejection")
+                .with(authentication(principalOf(OWNER_ID)))
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(objectMapper.writeValueAsString(RejectSpendingRequest("증빙 이미지가 흐립니다."))),
+        )
+            .andExpect(status().isConflict)
+            .andExpect(jsonPath("$.success").value(false))
+            .andExpect(jsonPath("$.code").value("EVENT_ALREADY_CLOSED"))
+    }
+
+    @Test
     @DisplayName("반려 사유가 비어 있으면 400과 필드 오류를 반환한다")
     fun rejectWithoutReason() {
         mockMvc.perform(
