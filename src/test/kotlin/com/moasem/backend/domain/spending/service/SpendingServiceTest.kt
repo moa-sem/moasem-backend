@@ -311,6 +311,23 @@ class SpendingServiceTest {
         }
 
         @Test
+        fun `마감된 행사의 PENDING 지출은 수정할 수 없고 내용이 보존된다`() {
+            val spending = savedSpending()
+            every { eventAccessProvider.findAccess(EVENT_ID) } returns activeEvent(isActive = false)
+            every { spendingRepository.findByIdAndEventId(SPENDING_ID, EVENT_ID) } returns spending
+
+            assertThatThrownBy {
+                spendingService.updateSpending(EVENT_ID, SPENDING_ID, MEMBER_ID, updateRequest())
+            }.hasErrorCode(ErrorCode.EVENT_ALREADY_CLOSED)
+
+            assertThat(spending.status).isEqualTo(SpendingStatus.PENDING)
+            assertThat(spending.amount).isEqualTo(15_000L)
+            assertThat(spending.reason).isEqualTo("1일차 점심 식사")
+            assertThat(spending.evidenceStorageKey).isEqualTo(evidenceKey(MEMBER_ID))
+            verify(exactly = 0) { spendingRepository.findByIdAndEventId(any(), any()) }
+        }
+
+        @Test
         fun `남이 신청한 지출은 수정할 수 없다`() {
             every { groupAccessProvider.isMember(GROUP_ID, OUTSIDER_ID) } returns true
             every { spendingRepository.findByIdAndEventId(SPENDING_ID, EVENT_ID) } returns savedSpending()

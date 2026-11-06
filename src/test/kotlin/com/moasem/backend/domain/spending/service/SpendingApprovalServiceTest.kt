@@ -64,6 +64,20 @@ class SpendingApprovalServiceTest {
         }
 
         @Test
+        fun `마감된 행사의 PENDING 지출은 승인할 수 없고 상태가 보존된다`() {
+            val spending = givenPendingSpending()
+            every { eventAccessProvider.findAccess(EVENT_ID) } returns EventAccess(EVENT_ID, GROUP_ID, false)
+
+            assertThatThrownBy { approvalService.approve(EVENT_ID, SPENDING_ID, OWNER_ID) }
+                .hasErrorCode(ErrorCode.EVENT_ALREADY_CLOSED)
+
+            assertThat(spending.status).isEqualTo(SpendingStatus.PENDING)
+            assertThat(spending.processedByUserId).isNull()
+            assertThat(spending.processedAt).isNull()
+            verify(exactly = 0) { spendingRepository.findWithLockByIdAndEventId(any(), any()) }
+        }
+
+        @Test
         fun `모임장이 아닌 구성원은 승인할 수 없다`() {
             assertThatThrownBy { approvalService.approve(EVENT_ID, SPENDING_ID, MEMBER_ID) }
                 .hasErrorCode(ErrorCode.NOT_GROUP_OWNER)
@@ -102,6 +116,21 @@ class SpendingApprovalServiceTest {
             assertThat(spending.rejectionReason).isEqualTo("증빙 이미지가 흐립니다.")
             assertThat(response.rejectionReason).isEqualTo("증빙 이미지가 흐립니다.")
             assertThat(response.processedByUserId).isEqualTo(OWNER_ID)
+        }
+
+        @Test
+        fun `마감된 행사의 PENDING 지출은 반려할 수 없고 상태가 보존된다`() {
+            val spending = givenPendingSpending()
+            every { eventAccessProvider.findAccess(EVENT_ID) } returns EventAccess(EVENT_ID, GROUP_ID, false)
+
+            assertThatThrownBy { approvalService.reject(EVENT_ID, SPENDING_ID, OWNER_ID, rejectRequest()) }
+                .hasErrorCode(ErrorCode.EVENT_ALREADY_CLOSED)
+
+            assertThat(spending.status).isEqualTo(SpendingStatus.PENDING)
+            assertThat(spending.rejectionReason).isNull()
+            assertThat(spending.processedByUserId).isNull()
+            assertThat(spending.processedAt).isNull()
+            verify(exactly = 0) { spendingRepository.findWithLockByIdAndEventId(any(), any()) }
         }
 
         @Test
