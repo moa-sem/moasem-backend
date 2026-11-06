@@ -31,7 +31,9 @@ class EventDeletionServiceTest {
         every { groupAccessProvider.existsGroup(GROUP_ID) } returns true
         every { groupAccessProvider.isMember(GROUP_ID, OWNER_ID) } returns true
         every { groupAccessProvider.isOwner(GROUP_ID, OWNER_ID) } returns true
-        every { eventRepository.findByIdAndGroupIdAndDeletedAtIsNull(EVENT_ID, GROUP_ID) } returns event(EVENT_ID)
+        every {
+            eventRepository.findByIdAndGroupIdAndDeletedAtIsNullForUpdate(EVENT_ID, GROUP_ID)
+        } returns event(EVENT_ID)
         every { spendingHistoryProvider.hasAnySpending(EVENT_ID) } returns false
     }
 
@@ -42,7 +44,7 @@ class EventDeletionServiceTest {
         @Test
         fun `OWNER는 지출 이력이 없는 ACTIVE 행사를 논리 삭제한다`() {
             val event = event(EVENT_ID)
-            every { eventRepository.findByIdAndGroupIdAndDeletedAtIsNull(EVENT_ID, GROUP_ID) } returns event
+            every { eventRepository.findByIdAndGroupIdAndDeletedAtIsNullForUpdate(EVENT_ID, GROUP_ID) } returns event
 
             eventDeletionService.deleteEvent(GROUP_ID, EVENT_ID, OWNER_ID)
 
@@ -79,7 +81,7 @@ class EventDeletionServiceTest {
 
         @Test
         fun `존재하지 않는 행사는 삭제할 수 없다`() {
-            every { eventRepository.findByIdAndGroupIdAndDeletedAtIsNull(EVENT_ID, GROUP_ID) } returns null
+            every { eventRepository.findByIdAndGroupIdAndDeletedAtIsNullForUpdate(EVENT_ID, GROUP_ID) } returns null
 
             assertThatThrownBy { eventDeletionService.deleteEvent(GROUP_ID, EVENT_ID, OWNER_ID) }
                 .hasErrorCode(ErrorCode.EVENT_NOT_FOUND)
@@ -87,7 +89,7 @@ class EventDeletionServiceTest {
 
         @Test
         fun `다른 모임에 속한 행사는 삭제할 수 없다`() {
-            every { eventRepository.findByIdAndGroupIdAndDeletedAtIsNull(EVENT_ID, GROUP_ID) } returns null
+            every { eventRepository.findByIdAndGroupIdAndDeletedAtIsNullForUpdate(EVENT_ID, GROUP_ID) } returns null
 
             assertThatThrownBy { eventDeletionService.deleteEvent(GROUP_ID, EVENT_ID, OWNER_ID) }
                 .hasErrorCode(ErrorCode.EVENT_NOT_FOUND)
@@ -96,7 +98,7 @@ class EventDeletionServiceTest {
         @Test
         fun `CLOSED 행사는 삭제할 수 없다`() {
             every {
-                eventRepository.findByIdAndGroupIdAndDeletedAtIsNull(EVENT_ID, GROUP_ID)
+                eventRepository.findByIdAndGroupIdAndDeletedAtIsNullForUpdate(EVENT_ID, GROUP_ID)
             } returns event(EVENT_ID, EventStatus.CLOSED)
 
             assertThatThrownBy { eventDeletionService.deleteEvent(GROUP_ID, EVENT_ID, OWNER_ID) }
@@ -116,12 +118,12 @@ class EventDeletionServiceTest {
 
         @Test
         fun `논리 삭제된 행사는 재삭제 대상에서 제외한다`() {
-            every { eventRepository.findByIdAndGroupIdAndDeletedAtIsNull(EVENT_ID, GROUP_ID) } returns null
+            every { eventRepository.findByIdAndGroupIdAndDeletedAtIsNullForUpdate(EVENT_ID, GROUP_ID) } returns null
 
             assertThatThrownBy { eventDeletionService.deleteEvent(GROUP_ID, EVENT_ID, OWNER_ID) }
                 .hasErrorCode(ErrorCode.EVENT_NOT_FOUND)
 
-            verify { eventRepository.findByIdAndGroupIdAndDeletedAtIsNull(EVENT_ID, GROUP_ID) }
+            verify { eventRepository.findByIdAndGroupIdAndDeletedAtIsNullForUpdate(EVENT_ID, GROUP_ID) }
         }
     }
 

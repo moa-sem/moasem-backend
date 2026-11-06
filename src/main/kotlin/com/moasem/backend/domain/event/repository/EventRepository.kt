@@ -33,4 +33,15 @@ interface EventRepository : JpaRepository<Event, Long> {
         @Param("eventId") eventId: Long,
         @Param("groupId") groupId: Long,
     ): Event?
+
+    @Lock(LockModeType.PESSIMISTIC_WRITE)
+    @Query(
+        """
+        SELECT e
+        FROM Event e
+        WHERE e.id = :eventId
+          AND e.deletedAt IS NULL
+        """,
+    )
+    fun findByIdAndDeletedAtIsNullForUpdate(@Param("eventId") eventId: Long): Event?
 }

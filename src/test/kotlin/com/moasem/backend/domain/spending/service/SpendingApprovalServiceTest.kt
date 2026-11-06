@@ -14,6 +14,7 @@ import com.moasem.backend.global.error.hasErrorCode
 import io.mockk.every
 import io.mockk.mockk
 import io.mockk.verify
+import io.mockk.verifyOrder
 import org.assertj.core.api.Assertions.assertThat
 import org.assertj.core.api.Assertions.assertThatThrownBy
 import org.junit.jupiter.api.BeforeEach
@@ -32,7 +33,7 @@ class SpendingApprovalServiceTest {
     @BeforeEach
     fun setUp() {
         approvalService = SpendingApprovalService(spendingRepository, eventAccessProvider, groupAccessProvider)
-        every { eventAccessProvider.findAccess(EVENT_ID) } returns EventAccess(EVENT_ID, GROUP_ID, true)
+        every { eventAccessProvider.findAccessForUpdate(EVENT_ID) } returns EventAccess(EVENT_ID, GROUP_ID, true)
         every { groupAccessProvider.isOwner(GROUP_ID, OWNER_ID) } returns true
         every { groupAccessProvider.isOwner(GROUP_ID, MEMBER_ID) } returns false
     }
@@ -66,7 +67,7 @@ class SpendingApprovalServiceTest {
         @Test
         fun `마감된 행사의 PENDING 지출은 승인할 수 없고 상태가 보존된다`() {
             val spending = givenPendingSpending()
-            every { eventAccessProvider.findAccess(EVENT_ID) } returns EventAccess(EVENT_ID, GROUP_ID, false)
+            every { eventAccessProvider.findAccessForUpdate(EVENT_ID) } returns EventAccess(EVENT_ID, GROUP_ID, false)
 
             assertThatThrownBy { approvalService.approve(EVENT_ID, SPENDING_ID, OWNER_ID) }
                 .hasErrorCode(ErrorCode.EVENT_ALREADY_CLOSED)
@@ -95,7 +96,7 @@ class SpendingApprovalServiceTest {
 
         @Test
         fun `없는 행사의 지출은 처리할 수 없다`() {
-            every { eventAccessProvider.findAccess(EVENT_ID) } returns null
+            every { eventAccessProvider.findAccessForUpdate(EVENT_ID) } returns null
 
             assertThatThrownBy { approvalService.approve(EVENT_ID, SPENDING_ID, OWNER_ID) }
                 .hasErrorCode(ErrorCode.EVENT_NOT_FOUND)
@@ -121,7 +122,7 @@ class SpendingApprovalServiceTest {
         @Test
         fun `마감된 행사의 PENDING 지출은 반려할 수 없고 상태가 보존된다`() {
             val spending = givenPendingSpending()
-            every { eventAccessProvider.findAccess(EVENT_ID) } returns EventAccess(EVENT_ID, GROUP_ID, false)
+            every { eventAccessProvider.findAccessForUpdate(EVENT_ID) } returns EventAccess(EVENT_ID, GROUP_ID, false)
 
             assertThatThrownBy { approvalService.reject(EVENT_ID, SPENDING_ID, OWNER_ID, rejectRequest()) }
                 .hasErrorCode(ErrorCode.EVENT_ALREADY_CLOSED)
@@ -162,6 +163,11 @@ class SpendingApprovalServiceTest {
             approvalService.approve(EVENT_ID, SPENDING_ID, OWNER_ID)
 
             verify(exactly = 1) { spendingRepository.findWithLockByIdAndEventId(SPENDING_ID, EVENT_ID) }
+            verifyOrder {
+                eventAccessProvider.findAccessForUpdate(EVENT_ID)
+                groupAccessProvider.isOwner(GROUP_ID, OWNER_ID)
+                spendingRepository.findWithLockByIdAndEventId(SPENDING_ID, EVENT_ID)
+            }
         }
 
         @Test
