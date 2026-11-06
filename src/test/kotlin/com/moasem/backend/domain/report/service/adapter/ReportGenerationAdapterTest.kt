@@ -2,6 +2,7 @@ package com.moasem.backend.domain.report.service.adapter
 
 import com.moasem.backend.domain.report.entity.Report
 import com.moasem.backend.domain.report.service.ReportGenerationService
+import com.moasem.backend.domain.report.service.ReportSnapshotPreparationService
 import io.mockk.every
 import io.mockk.mockk
 import io.mockk.verify
@@ -18,7 +19,8 @@ import org.junit.jupiter.api.Test
 class ReportGenerationAdapterTest {
 
     private val reportGenerationService = mockk<ReportGenerationService>()
-    private val adapter = ReportGenerationAdapter(reportGenerationService)
+    private val reportSnapshotPreparationService = mockk<ReportSnapshotPreparationService>()
+    private val adapter = ReportGenerationAdapter(reportGenerationService, reportSnapshotPreparationService)
 
     @Test
     @DisplayName("마감 요청을 보고서 생성으로 전달한다")

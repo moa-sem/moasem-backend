@@ -45,13 +45,12 @@ class ReportGenerationServiceTest {
 
         service = ReportGenerationService(
             reportRepository = reportRepository,
-            eventSnapshotProvider = snapshotProvider,
-            snapshotCalculator = ReportSnapshotCalculator(),
             pdfGenerator = ReportPdfGenerator(),
             csvGenerator = ReportCsvGenerator(),
             fileStorage = fileStorage,
             aiClient = aiClient,
         )
+        prepareReport()
     }
 
     @Nested
@@ -82,6 +81,19 @@ class ReportGenerationServiceTest {
         }
 
         @Test
+        fun `PDF CSV AI 생성은 마감 시 저장한 스냅샷을 사용한다`() {
+            val fixedSnapshot = stored.getValue(EVENT_ID).snapshot
+            snapshotProvider.given(sampleData(eventId = EVENT_ID, initialBudget = 999_999L))
+
+            val report = service.generate(EVENT_ID)
+
+            assertThat(report.snapshot).isSameAs(fixedSnapshot)
+            assertThat(report.totalBudget).isEqualTo(500_000L)
+            assertThat(aiClient.lastInput?.totalBudget).isEqualTo(500_000L)
+            assertThat(fileStorage.storedKeys()).hasSize(2)
+        }
+
+        @Test
         fun `스냅샷이 확정되고 조회용 금액이 채워진다`() {
             snapshotProvider.given(
                 sampleData(
@@ -90,6 +102,7 @@ class ReportGenerationServiceTest {
                     approvedSpendings = listOf(sampleSpending(amount = 320_000L)),
                 ),
             )
+            prepareReport()
 
             val report = service.generate(EVENT_ID)
 
@@ -159,6 +172,8 @@ class ReportGenerationServiceTest {
 
             assertThat(report.status).isEqualTo(ReportStatus.FAILED)
             assertThat(report.failureReason).contains("S3 연결 실패")
+            assertThat(report.snapshot).isNotNull()
+            assertThat(report.totalBudget).isEqualTo(500_000L)
         }
 
         @Test
@@ -205,40 +220,12 @@ class ReportGenerationServiceTest {
     inner class Preconditions {
 
         @Test
-        fun `행사당 보고서는 한 건만 만들 수 있다`() {
-            service.generate(EVENT_ID)
+        fun `마감 트랜잭션에서 확정한 보고서가 없으면 생성하지 않는다`() {
+            stored.clear()
 
             assertThatThrownBy { service.generate(EVENT_ID) }
                 .isInstanceOf(BusinessException::class.java)
-                .hasFieldOrPropertyWithValue("errorCode", ErrorCode.REPORT_ALREADY_EXISTS)
-        }
-
-        @Test
-        @DisplayName("마감되지 않은 행사는 보고서 행을 만들기 전에 거부된다")
-        fun rejectsActiveEventBeforeCreatingRow() {
-            snapshotProvider.given(sampleData(eventId = EVENT_ID, status = "ACTIVE"))
-
-            assertThatThrownBy { service.generate(EVENT_ID) }
-                .isInstanceOf(BusinessException::class.java)
-                .hasFieldOrPropertyWithValue("errorCode", ErrorCode.EVENT_NOT_CLOSED)
-
-            // FAILED 행이 남으면 나중에 행사가 실제로 마감돼도 event_id unique 제약 때문에
-            // 새 보고서를 만들 수 없다. 행 자체가 생기지 않아야 한다.
-            assertThat(stored).isEmpty()
-        }
-
-        @Test
-        @DisplayName("거부된 뒤 행사가 마감되면 정상 생성된다")
-        fun generatesAfterEventIsClosed() {
-            snapshotProvider.given(sampleData(eventId = EVENT_ID, status = "ACTIVE"))
-            assertThatThrownBy { service.generate(EVENT_ID) }
-                .isInstanceOf(BusinessException::class.java)
-
-            snapshotProvider.given(sampleData(eventId = EVENT_ID, status = "CLOSED"))
-
-            val report = service.generate(EVENT_ID)
-
-            assertThat(report.status).isEqualTo(ReportStatus.COMPLETED)
+                .hasFieldOrPropertyWithValue("errorCode", ErrorCode.REPORT_NOT_FOUND)
         }
     }
 
@@ -246,13 +233,16 @@ class ReportGenerationServiceTest {
         storage: com.moasem.backend.domain.report.service.port.ReportFileStorage,
     ) = ReportGenerationService(
         reportRepository = reportRepository,
-        eventSnapshotProvider = snapshotProvider,
-        snapshotCalculator = ReportSnapshotCalculator(),
         pdfGenerator = ReportPdfGenerator(),
         csvGenerator = ReportCsvGenerator(),
         fileStorage = storage,
         aiClient = aiClient,
     )
+
+    private fun prepareReport() {
+        val snapshot = ReportSnapshotCalculator().calculate(snapshotProvider.fetch(EVENT_ID))
+        stored[EVENT_ID] = Report.create(EVENT_ID).also { it.applySnapshot(snapshot) }
+    }
 
     companion object {
         private const val EVENT_ID = 1L
